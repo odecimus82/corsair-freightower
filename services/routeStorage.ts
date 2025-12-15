@@ -5,11 +5,22 @@ const ROUTE_STORAGE_KEY = 'freightflow_route_db';
 const PORT_STORAGE_KEY = 'freightflow_port_db';
 const NOTIFICATION_STORAGE_KEY = 'freightflow_notifications';
 
+// Helper to safely parse JSON from localStorage
+const safeParse = <T>(key: string, fallback: T): T => {
+    try {
+        const data = localStorage.getItem(key);
+        return data ? JSON.parse(data) : fallback;
+    } catch (e) {
+        console.error(`Failed to parse localStorage for key "${key}", resetting to default.`, e);
+        localStorage.removeItem(key); // Clear corrupt data
+        return fallback;
+    }
+};
+
 // Notification System Service
 export const NotificationDB = {
     getAll: (): AppNotification[] => {
-        const data = localStorage.getItem(NOTIFICATION_STORAGE_KEY);
-        return data ? JSON.parse(data) : [];
+        return safeParse<AppNotification[]>(NOTIFICATION_STORAGE_KEY, []);
     },
 
     add: (note: AppNotification) => {
@@ -34,8 +45,7 @@ export const NotificationDB = {
 // Simulate a backend database connection for Routes
 export const RouteDB = {
     getAll: (): RouteOverride[] => {
-        const data = localStorage.getItem(ROUTE_STORAGE_KEY);
-        return data ? JSON.parse(data) : [];
+        return safeParse<RouteOverride[]>(ROUTE_STORAGE_KEY, []);
     },
 
     get: (origin: string, destination: string): RouteOverride | undefined => {
@@ -84,8 +94,7 @@ export const RouteDB = {
 // Simulate a backend database connection for Custom Ports
 export const PortDB = {
     getAll: (): TerminalOption[] => {
-        const data = localStorage.getItem(PORT_STORAGE_KEY);
-        return data ? JSON.parse(data) : [];
+        return safeParse<TerminalOption[]>(PORT_STORAGE_KEY, []);
     },
 
     save: (port: TerminalOption) => {
