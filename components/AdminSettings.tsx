@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { Save, Trash2, Database, Edit3, Plus, ArrowRight, Anchor, MapPin, RefreshCw, XCircle, Settings, Layers } from 'lucide-react';
+import { Save, Trash2, Database, Edit3, Plus, ArrowRight, Anchor, MapPin, RefreshCw, XCircle, Settings, Layers, Loader2 } from 'lucide-react';
 import { getCombinedTerminals } from '../services/portData';
-import { calculateRouteDetails } from '../services/geminiService';
+import { calculateQuickMetrics } from '../services/geminiService';
 import { RouteDB, PortDB } from '../services/routeStorage';
 import { RouteOverride, TerminalOption } from '../types';
 
@@ -46,12 +46,19 @@ export const AdminSettings: React.FC = () => {
     const fetchRouteEstimates = async (o: string, d: string) => {
         if (!o || !d) return;
         setIsFetchingRoute(true);
+        // Visual reset while loading
+        setOceanDist(0);
+        setAirDist(0);
+        setOceanTime('');
+        setAirTime('');
+        
         try {
-            const data = await calculateRouteDetails(o, d);
-            setOceanDist(data.ocean.distanceNm);
-            setOceanTime(data.ocean.transitTimeDays);
-            setAirDist(data.air.distanceKm);
-            setAirTime(data.air.transitTimeHours);
+            // Using the new optimized function for faster results
+            const data = await calculateQuickMetrics(o, d);
+            setOceanDist(data.oceanDistance);
+            setOceanTime(data.oceanTime);
+            setAirDist(data.airDistance);
+            setAirTime(data.airTime);
         } catch (e) {
             console.error("Failed to fetch estimates", e);
         } finally {
@@ -224,7 +231,7 @@ export const AdminSettings: React.FC = () => {
                         <div className="space-y-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
                             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide flex justify-between items-center">
                                 Route Endpoints
-                                {isFetchingRoute && <RefreshCw className="w-3 h-3 animate-spin text-indigo-500" />}
+                                {isFetchingRoute && <span className="text-indigo-500 text-[10px] animate-pulse">Auto-calculating...</span>}
                             </h3>
                             <div>
                                 <label className="block text-xs font-medium text-slate-700 mb-1">Origin Port/Hub</label>
@@ -261,21 +268,29 @@ export const AdminSettings: React.FC = () => {
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-xs font-medium text-slate-700 mb-1">Distance (NM)</label>
-                                    <input 
-                                        type="number" 
-                                        value={oceanDist} onChange={e => setOceanDist(Number(e.target.value))}
-                                        className={`w-full p-2 border border-slate-200 rounded text-sm transition-colors ${isFetchingRoute ? 'bg-slate-50 text-slate-400' : ''}`}
-                                        placeholder="6500"
-                                    />
+                                    <div className="relative">
+                                        <input 
+                                            type="number" 
+                                            value={oceanDist} onChange={e => setOceanDist(Number(e.target.value))}
+                                            disabled={isFetchingRoute}
+                                            className={`w-full p-2 border border-slate-200 rounded text-sm transition-colors ${isFetchingRoute ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
+                                            placeholder="6500"
+                                        />
+                                        {isFetchingRoute && <Loader2 className="absolute right-2 top-2 w-4 h-4 animate-spin text-indigo-500" />}
+                                    </div>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-slate-700 mb-1">Time (Days)</label>
-                                    <input 
-                                        type="text" 
-                                        value={oceanTime} onChange={e => setOceanTime(e.target.value)}
-                                        className={`w-full p-2 border border-slate-200 rounded text-sm transition-colors ${isFetchingRoute ? 'bg-slate-50 text-slate-400' : ''}`}
-                                        placeholder="25-28"
-                                    />
+                                    <div className="relative">
+                                        <input 
+                                            type="text" 
+                                            value={oceanTime} onChange={e => setOceanTime(e.target.value)}
+                                            disabled={isFetchingRoute}
+                                            className={`w-full p-2 border border-slate-200 rounded text-sm transition-colors ${isFetchingRoute ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
+                                            placeholder="25-28"
+                                        />
+                                        {isFetchingRoute && <Loader2 className="absolute right-2 top-2 w-4 h-4 animate-spin text-indigo-500" />}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -287,27 +302,39 @@ export const AdminSettings: React.FC = () => {
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-xs font-medium text-slate-700 mb-1">Distance (km)</label>
-                                    <input 
-                                        type="number" 
-                                        value={airDist} onChange={e => setAirDist(Number(e.target.value))}
-                                        className={`w-full p-2 border border-slate-200 rounded text-sm transition-colors ${isFetchingRoute ? 'bg-slate-50 text-slate-400' : ''}`}
-                                        placeholder="9800"
-                                    />
+                                    <div className="relative">
+                                        <input 
+                                            type="number" 
+                                            value={airDist} onChange={e => setAirDist(Number(e.target.value))}
+                                            disabled={isFetchingRoute}
+                                            className={`w-full p-2 border border-slate-200 rounded text-sm transition-colors ${isFetchingRoute ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
+                                            placeholder="9800"
+                                        />
+                                        {isFetchingRoute && <Loader2 className="absolute right-2 top-2 w-4 h-4 animate-spin text-indigo-500" />}
+                                    </div>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-slate-700 mb-1">Time (Hrs)</label>
-                                    <input 
-                                        type="text" 
-                                        value={airTime} onChange={e => setAirTime(e.target.value)}
-                                        className={`w-full p-2 border border-slate-200 rounded text-sm transition-colors ${isFetchingRoute ? 'bg-slate-50 text-slate-400' : ''}`}
-                                        placeholder="14-16"
-                                    />
+                                    <div className="relative">
+                                        <input 
+                                            type="text" 
+                                            value={airTime} onChange={e => setAirTime(e.target.value)}
+                                            disabled={isFetchingRoute}
+                                            className={`w-full p-2 border border-slate-200 rounded text-sm transition-colors ${isFetchingRoute ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
+                                            placeholder="14-16"
+                                        />
+                                        {isFetchingRoute && <Loader2 className="absolute right-2 top-2 w-4 h-4 animate-spin text-indigo-500" />}
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
                         <div className="pt-2 mt-auto">
-                            <button type="submit" className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-lg text-sm font-bold transition-colors">
+                            <button 
+                                type="submit" 
+                                disabled={isFetchingRoute}
+                                className={`w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-lg text-sm font-bold transition-colors ${isFetchingRoute ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            >
                                 <Save className="w-4 h-4" /> Save Route
                             </button>
                              <button type="button" onClick={resetRouteForm} className="w-full mt-2 text-slate-500 text-xs hover:text-slate-800">

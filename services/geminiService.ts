@@ -195,6 +195,48 @@ export const getPortCongestion = async (portName: string): Promise<{ text: strin
     }
 }
 
+// NEW: Lightweight function for Admin UI - Speed Optimized
+export const calculateQuickMetrics = async (origin: string, destination: string): Promise<{
+    oceanDistance: number, oceanTime: string, airDistance: number, airTime: string
+}> => {
+    const prompt = `
+    Estimate logistics distance and transit time between "${origin}" and "${destination}".
+    Keep it strictly numeric where possible.
+    
+    Return JSON:
+    - oceanDistance (number, Nautical Miles)
+    - oceanTime (string, e.g. "25-28")
+    - airDistance (number, KM)
+    - airTime (string, e.g. "14-16")
+    `;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        oceanDistance: { type: Type.NUMBER },
+                        oceanTime: { type: Type.STRING },
+                        airDistance: { type: Type.NUMBER },
+                        airTime: { type: Type.STRING },
+                    },
+                    required: ["oceanDistance", "oceanTime", "airDistance", "airTime"]
+                }
+            }
+        });
+        const text = response.text;
+        if (!text) throw new Error("No data");
+        return JSON.parse(text);
+    } catch (error) {
+        console.error("Quick Metrics Failed", error);
+        return { oceanDistance: 0, oceanTime: "N/A", airDistance: 0, airTime: "N/A" };
+    }
+}
+
 export const calculateRouteDetails = async (origin: string, destination: string): Promise<RouteDetails> => {
     
     // 1. CHECK "BACKEND" OVERRIDES FIRST
