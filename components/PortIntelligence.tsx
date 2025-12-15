@@ -33,13 +33,22 @@ export const PortIntelligence: React.FC<PortIntelligenceProps> = ({ mode }) => {
         setTerminals(getCombinedTerminals());
     }, []);
 
-    const handleLookup = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!lookupQuery) return;
+    // Fixed: Now accepts an optional override string to handle click events immediately
+    // without waiting for the async React state update of 'lookupQuery'.
+    const handleLookup = async (e?: React.FormEvent, override?: string) => {
+        if (e) e.preventDefault();
+        
+        const query = override || lookupQuery;
+        
+        // Ensure UI stays in sync if we used a quick link
+        if (override) setLookupQuery(override);
+
+        if (!query) return;
+        
         setLoadingPort(true);
         setPortData(null);
         try {
-            const data = await getPortDetails(lookupQuery);
+            const data = await getPortDetails(query);
             setPortData(data);
         } catch (error) {
             console.error(error);
@@ -307,15 +316,15 @@ export const PortIntelligence: React.FC<PortIntelligenceProps> = ({ mode }) => {
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            {/* Empty State / Popular Links */}
+                            {/* Corrected: Added explicit 'value' fields to match services/portData.ts exactly */}
                             {[
-                                { name: 'Shanghai', code: 'CNSHA', type: 'OCEAN' },
-                                { name: 'Rotterdam', code: 'NLRTM', type: 'OCEAN' },
-                                { name: 'Los Angeles', code: 'USLAX', type: 'OCEAN' },
+                                { name: 'Shanghai', code: 'CNSHA', value: 'Shanghai Port' },
+                                { name: 'Rotterdam', code: 'NLRTM', value: 'Rotterdam Port' },
+                                { name: 'Los Angeles', code: 'USLAX', value: 'Port of Los Angeles' },
                             ].map((port) => (
                                 <button 
                                     key={port.code}
-                                    onClick={() => { setLookupQuery(port.name + ' Port'); handleLookup({ preventDefault: () => {} } as any); }}
+                                    onClick={() => handleLookup(undefined, port.value)}
                                     className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-lg hover:border-indigo-300 transition-all text-left group relative overflow-hidden"
                                 >
                                     <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
