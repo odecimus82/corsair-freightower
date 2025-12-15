@@ -4,8 +4,23 @@ import { Shipment, TransportMode, ShipmentStatus, PortDetails, RouteDetails, ETA
 import { RouteDB } from "./routeStorage";
 
 // Initialize Gemini Client
-// CRITICAL: process.env.API_KEY is handled by the environment
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// CRITICAL: Handle both Node.js (process.env) and Vite (import.meta.env) environments
+// to prevent "ReferenceError: process is not defined" in the browser.
+const getApiKey = (): string => {
+  // @ts-ignore - Check for Vite environment variable
+  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_KEY) {
+    // @ts-ignore
+    return import.meta.env.VITE_API_KEY;
+  }
+  // Fallback / Standard Node check
+  try {
+    return process.env.API_KEY || '';
+  } catch (e) {
+    return '';
+  }
+};
+
+const ai = new GoogleGenAI({ apiKey: getApiKey() });
 
 const SYSTEM_INSTRUCTION = `
 You are a Senior Supply Chain Expert and Logistics Risk Analyst with 20 years of experience in cross-border e-commerce logistics (Air, Sea, Land).
