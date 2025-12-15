@@ -14,6 +14,7 @@ export const PortIntelligence: React.FC<PortIntelligenceProps> = ({ mode }) => {
     const [terminals, setTerminals] = useState<TerminalOption[]>([]);
     
     // Lookup State
+    const [searchMode, setSearchMode] = useState<'OCEAN' | 'AIR'>('OCEAN'); // New toggle state
     const [lookupQuery, setLookupQuery] = useState('');
     const [portData, setPortData] = useState<PortDetails | null>(null);
     const [loadingPort, setLoadingPort] = useState(false);
@@ -32,6 +33,14 @@ export const PortIntelligence: React.FC<PortIntelligenceProps> = ({ mode }) => {
     useEffect(() => {
         setTerminals(getCombinedTerminals());
     }, []);
+
+    // Clear selection when switching modes
+    const handleModeToggle = (newMode: 'OCEAN' | 'AIR') => {
+        if (newMode !== searchMode) {
+            setSearchMode(newMode);
+            setLookupQuery(''); // Reset selection to avoid mismatch
+        }
+    };
 
     // Fixed: Now accepts an optional override string to handle click events immediately
     // without waiting for the async React state update of 'lookupQuery'.
@@ -98,41 +107,69 @@ export const PortIntelligence: React.FC<PortIntelligenceProps> = ({ mode }) => {
                     
                     <div className="relative z-10">
                         <h2 className="text-3xl font-bold text-slate-800 mb-3 tracking-tight">Global Port Intelligence</h2>
-                        <p className="text-slate-500 mb-8 max-w-lg mx-auto text-lg font-light">
-                            Access real-time infrastructure data, coordinates, and AI-driven capacity analysis for over 5,000 global logistics hubs.
+                        <p className="text-slate-500 mb-6 max-w-lg mx-auto text-lg font-light">
+                            Access real-time infrastructure data, coordinates, and AI-driven capacity analysis.
                         </p>
                         
-                        <form onSubmit={handleLookup} className="relative max-w-xl mx-auto">
-                            <div className="relative shadow-lg rounded-xl transition-shadow focus-within:shadow-indigo-500/20">
-                                <Search className="w-5 h-5 text-slate-400 absolute left-4 top-4 z-10 pointer-events-none" />
-                                <select 
-                                    className="w-full pl-12 pr-32 py-4 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all appearance-none bg-white text-slate-700 text-base font-medium cursor-pointer hover:border-slate-300"
-                                    value={lookupQuery}
-                                    onChange={(e) => setLookupQuery(e.target.value)}
+                        <div className="max-w-xl mx-auto space-y-4">
+                            {/* Mode Switcher Slider */}
+                            <div className="inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner">
+                                <button
+                                    onClick={() => handleModeToggle('OCEAN')}
+                                    className={`flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
+                                        searchMode === 'OCEAN' 
+                                        ? 'bg-white text-blue-600 shadow-sm ring-1 ring-black/5' 
+                                        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+                                    }`}
                                 >
-                                    <option value="" disabled>Search by port name or UN/LOCODE...</option>
-                                    <optgroup label="Major Seaports">
-                                        {terminals.filter(t => t.type === 'OCEAN').map(t => (
-                                            <option key={t.value + t.type} value={t.value}>{t.label}</option>
-                                        ))}
-                                    </optgroup>
-                                    <optgroup label="International Airports">
-                                        {terminals.filter(t => t.type === 'AIR').map(t => (
-                                            <option key={t.value + t.type} value={t.value}>{t.label}</option>
-                                        ))}
-                                    </optgroup>
-                                </select>
-                                <div className="absolute right-2 top-2">
-                                    <button 
-                                        type="submit"
-                                        disabled={loadingPort || !lookupQuery}
-                                        className="bg-slate-900 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-indigo-600 disabled:opacity-50 transition-all shadow-md h-full"
-                                    >
-                                        {loadingPort ? 'Searching...' : 'Search'}
-                                    </button>
-                                </div>
+                                    <Ship className="w-4 h-4" />
+                                    Seaports
+                                </button>
+                                <button
+                                    onClick={() => handleModeToggle('AIR')}
+                                    className={`flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
+                                        searchMode === 'AIR' 
+                                        ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-black/5' 
+                                        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+                                    }`}
+                                >
+                                    <Plane className="w-4 h-4" />
+                                    Airports
+                                </button>
                             </div>
-                        </form>
+
+                            <form onSubmit={handleLookup} className="relative">
+                                <div className="relative shadow-lg rounded-xl transition-shadow focus-within:shadow-indigo-500/20">
+                                    <Search className="w-5 h-5 text-slate-400 absolute left-4 top-4 z-10 pointer-events-none" />
+                                    <select 
+                                        className="w-full pl-12 pr-32 py-4 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all appearance-none bg-white text-slate-700 text-base font-medium cursor-pointer hover:border-slate-300"
+                                        value={lookupQuery}
+                                        onChange={(e) => setLookupQuery(e.target.value)}
+                                    >
+                                        <option value="" disabled>
+                                            {searchMode === 'OCEAN' ? 'Select a Seaport...' : 'Select an International Airport...'}
+                                        </option>
+                                        
+                                        {/* Filtered Options based on Toggle */}
+                                        {terminals
+                                            .filter(t => t.type === searchMode)
+                                            .map(t => (
+                                                <option key={t.value + t.type} value={t.value}>{t.label}</option>
+                                            ))
+                                        }
+                                    </select>
+                                    <div className="absolute right-2 top-2">
+                                        <button 
+                                            type="submit"
+                                            disabled={loadingPort || !lookupQuery}
+                                            className="bg-slate-900 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-indigo-600 disabled:opacity-50 transition-all shadow-md h-full"
+                                        >
+                                            {loadingPort ? 'Searching...' : 'Search'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
                     </div>
                 </div>
 
