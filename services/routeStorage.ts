@@ -6,13 +6,22 @@ const PORT_STORAGE_KEY = 'freightflow_port_db';
 const NOTIFICATION_STORAGE_KEY = 'freightflow_notifications';
 
 // Helper to safely parse JSON from localStorage
+// Updated to handle SecurityErrors (if storage is disabled) without crashing
 const safeParse = <T>(key: string, fallback: T): T => {
     try {
-        const data = localStorage.getItem(key);
+        if (typeof window === 'undefined' || !window.localStorage) return fallback;
+        const data = window.localStorage.getItem(key);
         return data ? JSON.parse(data) : fallback;
     } catch (e) {
-        console.error(`Failed to parse localStorage for key "${key}", resetting to default.`, e);
-        localStorage.removeItem(key); // Clear corrupt data
+        console.warn(`Storage access failed for ${key}`, e);
+        try {
+            // Attempt to clear if possible, but ignore if this also fails (e.g. SecurityError)
+            if (typeof window !== 'undefined' && window.localStorage) {
+                window.localStorage.removeItem(key);
+            }
+        } catch (cleanupError) {
+            // Ignore cleanup errors
+        }
         return fallback;
     }
 };
@@ -24,21 +33,33 @@ export const NotificationDB = {
     },
 
     add: (note: AppNotification) => {
-        const list = NotificationDB.getAll();
-        list.unshift(note); // Add to top
-        // Keep max 50 notifications
-        if (list.length > 50) list.pop();
-        localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(list));
+        try {
+            const list = NotificationDB.getAll();
+            list.unshift(note); // Add to top
+            // Keep max 50 notifications
+            if (list.length > 50) list.pop();
+            localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(list));
+        } catch (e) {
+            console.warn("Failed to save notification", e);
+        }
     },
 
     markAllRead: () => {
-        const list = NotificationDB.getAll();
-        const updated = list.map(n => ({...n, read: true}));
-        localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(updated));
+        try {
+            const list = NotificationDB.getAll();
+            const updated = list.map(n => ({...n, read: true}));
+            localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(updated));
+        } catch (e) {
+            console.warn("Failed to update notifications", e);
+        }
     },
 
     clear: () => {
-         localStorage.removeItem(NOTIFICATION_STORAGE_KEY);
+        try {
+            localStorage.removeItem(NOTIFICATION_STORAGE_KEY);
+        } catch (e) {
+             console.warn("Failed to clear notifications", e);
+        }
     }
 };
 
@@ -56,38 +77,46 @@ export const RouteDB = {
     },
 
     save: (route: RouteOverride) => {
-        const routes = RouteDB.getAll();
-        const existingIndex = routes.findIndex(r => r.id === route.id);
-        
-        let isUpdate = false;
-        if (existingIndex >= 0) {
-            routes[existingIndex] = route;
-            isUpdate = true;
-        } else {
-            routes.push(route);
-        }
-        
-        localStorage.setItem(ROUTE_STORAGE_KEY, JSON.stringify(routes));
+        try {
+            const routes = RouteDB.getAll();
+            const existingIndex = routes.findIndex(r => r.id === route.id);
+            
+            let isUpdate = false;
+            if (existingIndex >= 0) {
+                routes[existingIndex] = route;
+                isUpdate = true;
+            } else {
+                routes.push(route);
+            }
+            
+            localStorage.setItem(ROUTE_STORAGE_KEY, JSON.stringify(routes));
 
-        // Generate Notification
-        NotificationDB.add({
-            id: Date.now().toString(),
-            title: isUpdate ? 'Route Updated' : 'New Route Added',
-            message: `${route.origin} → ${route.destination}`,
-            timestamp: new Date().toISOString(),
-            read: false,
-            type: 'ROUTE'
-        });
-        
-        // Dispatch event so App.tsx can update the Bell icon immediately
-        window.dispatchEvent(new Event('freightflow:update'));
+            // Generate Notification
+            NotificationDB.add({
+                id: Date.now().toString(),
+                title: isUpdate ? 'Route Updated' : 'New Route Added',
+                message: `${route.origin} → ${route.destination}`,
+                timestamp: new Date().toISOString(),
+                read: false,
+                type: 'ROUTE'
+            });
+            
+            // Dispatch event so App.tsx can update the Bell icon immediately
+            window.dispatchEvent(new Event('freightflow:update'));
+        } catch (e) {
+            console.warn("Failed to save route", e);
+        }
     },
 
     delete: (id: string) => {
-        const routes = RouteDB.getAll();
-        const newRoutes = routes.filter(r => r.id !== id);
-        localStorage.setItem(ROUTE_STORAGE_KEY, JSON.stringify(newRoutes));
-        window.dispatchEvent(new Event('freightflow:update'));
+        try {
+            const routes = RouteDB.getAll();
+            const newRoutes = routes.filter(r => r.id !== id);
+            localStorage.setItem(ROUTE_STORAGE_KEY, JSON.stringify(newRoutes));
+            window.dispatchEvent(new Event('freightflow:update'));
+        } catch (e) {
+            console.warn("Failed to delete route", e);
+        }
     }
 };
 
@@ -98,36 +127,44 @@ export const PortDB = {
     },
 
     save: (port: TerminalOption) => {
-        const ports = PortDB.getAll();
-        // Check duplicates by value (name)
-        const existingIndex = ports.findIndex(p => p.value === port.value);
-        
-        if (existingIndex >= 0) {
-            ports[existingIndex] = port;
-        } else {
-            ports.push(port);
-        }
-        
-        localStorage.setItem(PORT_STORAGE_KEY, JSON.stringify(ports));
+        try {
+            const ports = PortDB.getAll();
+            // Check duplicates by value (name)
+            const existingIndex = ports.findIndex(p => p.value === port.value);
+            
+            if (existingIndex >= 0) {
+                ports[existingIndex] = port;
+            } else {
+                ports.push(port);
+            }
+            
+            localStorage.setItem(PORT_STORAGE_KEY, JSON.stringify(ports));
 
-        // Generate Notification
-        NotificationDB.add({
-            id: Date.now().toString(),
-            title: 'Custom Hub Added',
-            message: port.label.split(' - ')[0],
-            timestamp: new Date().toISOString(),
-            read: false,
-            type: 'PORT'
-        });
-        
-        // Dispatch event so App.tsx can update the Bell icon immediately
-        window.dispatchEvent(new Event('freightflow:update'));
+            // Generate Notification
+            NotificationDB.add({
+                id: Date.now().toString(),
+                title: 'Custom Hub Added',
+                message: port.label.split(' - ')[0],
+                timestamp: new Date().toISOString(),
+                read: false,
+                type: 'PORT'
+            });
+            
+            // Dispatch event so App.tsx can update the Bell icon immediately
+            window.dispatchEvent(new Event('freightflow:update'));
+        } catch (e) {
+             console.warn("Failed to save port", e);
+        }
     },
 
     delete: (value: string) => {
-        const ports = PortDB.getAll();
-        const newPorts = ports.filter(p => p.value !== value);
-        localStorage.setItem(PORT_STORAGE_KEY, JSON.stringify(newPorts));
-        window.dispatchEvent(new Event('freightflow:update'));
+        try {
+            const ports = PortDB.getAll();
+            const newPorts = ports.filter(p => p.value !== value);
+            localStorage.setItem(PORT_STORAGE_KEY, JSON.stringify(newPorts));
+            window.dispatchEvent(new Event('freightflow:update'));
+        } catch (e) {
+             console.warn("Failed to delete port", e);
+        }
     }
 };
