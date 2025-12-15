@@ -231,7 +231,7 @@ export const PortIntelligence: React.FC<PortIntelligenceProps> = ({ mode }) => {
                                             <div className="flex gap-3">
                                                 <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
                                                 <p className="text-xs text-blue-700 leading-relaxed">
-                                                    Infrastructure data is aggregated from global shipping indices and AI analysis.
+                                                    Infrastructure data is aggregated from global shipping indices.
                                                 </p>
                                             </div>
                                         </div>
@@ -450,29 +450,30 @@ export const PortIntelligence: React.FC<PortIntelligenceProps> = ({ mode }) => {
                         <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-right-4 duration-500">
                              
                             {/* Route Summary Header */}
-                            <div className="bg-white rounded-2xl p-6 md:p-8 border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
-                                <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
-                                <div className="flex items-center gap-4 w-full md:w-auto">
-                                    <div className="text-center md:text-left">
+                            <div className="bg-white rounded-2xl p-6 md:p-8 border border-slate-200 shadow-sm flex flex-col items-center gap-6 relative overflow-hidden">
+                                <div className="absolute top-0 left-0 w-full h-1 sm:w-1 sm:h-full bg-indigo-500"></div>
+                                <div className="flex flex-col sm:flex-row items-center justify-between w-full gap-6 sm:gap-4 z-10">
+                                    
+                                    <div className="text-center sm:text-left flex-1 min-w-0">
                                         <div className="text-sm text-slate-500 font-medium mb-1">Origin</div>
-                                        <div className="text-2xl font-bold text-slate-800">{routeData.origin.split(',')[0]}</div>
+                                        <div className="text-xl sm:text-2xl font-bold text-slate-800 break-words leading-tight">{routeData.origin.split(',')[0]}</div>
                                         <div className="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-500 inline-block mt-1">{routeData.origin.split(',')[1] || 'Global'}</div>
                                     </div>
                                     
-                                    <div className="flex-1 md:flex-none flex flex-col items-center px-4 md:px-8">
-                                        <div className="flex items-center gap-1 text-slate-300 mb-1 w-full justify-center">
-                                            <div className="h-[2px] w-8 md:w-16 bg-slate-200"></div>
-                                            <div className="bg-slate-100 p-1.5 rounded-full">
+                                    <div className="flex flex-col items-center justify-center shrink-0">
+                                        <div className="flex items-center gap-1 text-slate-300 mb-1">
+                                            <div className="hidden sm:block h-[2px] w-8 md:w-16 bg-slate-200"></div>
+                                            <div className="bg-slate-100 p-2 rounded-full transform rotate-90 sm:rotate-0 transition-transform">
                                                 <ArrowRight className="w-4 h-4 text-slate-400" />
                                             </div>
-                                            <div className="h-[2px] w-8 md:w-16 bg-slate-200"></div>
+                                            <div className="hidden sm:block h-[2px] w-8 md:w-16 bg-slate-200"></div>
                                         </div>
-                                        <span className="text-xs font-bold text-indigo-600 uppercase tracking-widest">Analysis Complete</span>
+                                        <span className="text-[10px] sm:text-xs font-bold text-indigo-600 uppercase tracking-wide sm:tracking-widest mt-1 text-center">Analysis Complete</span>
                                     </div>
 
-                                    <div className="text-center md:text-right">
+                                    <div className="text-center sm:text-right flex-1 min-w-0">
                                         <div className="text-sm text-slate-500 font-medium mb-1">Destination</div>
-                                        <div className="text-2xl font-bold text-slate-800">{routeData.destination.split(',')[0]}</div>
+                                        <div className="text-xl sm:text-2xl font-bold text-slate-800 break-words leading-tight">{routeData.destination.split(',')[0]}</div>
                                         <div className="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-500 inline-block mt-1">{routeData.destination.split(',')[1] || 'Global'}</div>
                                     </div>
                                 </div>
