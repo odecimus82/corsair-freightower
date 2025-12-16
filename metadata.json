@@ -1,5 +1,5 @@
 {
-  "name": "Corsair Freightflow - Global Logistics Tower",
-  "description": "An enterprise-grade cross-border supply chain monitoring platform. Features real-time shipment tracking, AI-driven risk analysis using Gemini, and comprehensive analytics for Air, Sea, and Land freight.",
+  "name": "Corsair Freightflow",
+  "description": "comprehensive analytics for Air, Sea, and Land freight.",
   "requestFramePermissions": []
 }
