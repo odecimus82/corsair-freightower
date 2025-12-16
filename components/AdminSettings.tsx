@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
-import { Save, Trash2, Database, Edit3, Plus, ArrowRight, Anchor, MapPin, RefreshCw, XCircle, Settings, Layers, Loader2, Ship, Plane } from 'lucide-react';
+import { Save, Trash2, Database, Edit3, Plus, ArrowRight, Anchor, MapPin, RefreshCw, XCircle, Settings, Layers, Loader2, Ship, Plane, Shield, Key } from 'lucide-react';
 import { getCombinedTerminals } from '../services/portData';
 import { calculateQuickMetrics } from '../services/geminiService';
 import { RouteDB, PortDB } from '../services/routeStorage';
 import { RouteOverride, TerminalOption } from '../types';
 
 export const AdminSettings: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'routes' | 'ports'>('routes');
+    const [activeTab, setActiveTab] = useState<'routes' | 'ports' | 'system'>('routes');
     
     // --- ROUTE STATE ---
     const [savedRoutes, setSavedRoutes] = useState<RouteOverride[]>([]);
@@ -41,8 +41,15 @@ export const AdminSettings: React.FC = () => {
     const [portCountry, setPortCountry] = useState('');
     const [editingPortValue, setEditingPortValue] = useState<string | null>(null);
 
+    // --- SYSTEM / API STATE ---
+    const [apiKey, setApiKey] = useState('');
+    const [showKey, setShowKey] = useState(false);
+
     useEffect(() => {
         refreshData();
+        // Load existing key from storage if present
+        const storedKey = localStorage.getItem('freightflow_api_key');
+        if (storedKey) setApiKey(storedKey);
     }, []);
 
     const refreshData = () => {
@@ -50,6 +57,24 @@ export const AdminSettings: React.FC = () => {
         setSavedPorts(PortDB.getAll());
         setTerminals(getCombinedTerminals()); 
     };
+
+    // --- SYSTEM HANDLERS ---
+    const handleSaveApiKey = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (apiKey.trim()) {
+            localStorage.setItem('freightflow_api_key', apiKey.trim());
+            alert("API Key Saved Successfully! The application will now reload to apply the new credentials.");
+            window.location.reload();
+        }
+    };
+
+    const handleClearApiKey = () => {
+        if(confirm("Remove API Key? The app will revert to using Mock Data or the default environment key.")) {
+            localStorage.removeItem('freightflow_api_key');
+            setApiKey('');
+            window.location.reload();
+        }
+    }
 
     // --- ROUTE HANDLERS ---
     
@@ -253,19 +278,99 @@ export const AdminSettings: React.FC = () => {
                 <div className="p-2 border-b border-slate-100 bg-slate-50/50 rounded-t-xl flex gap-1 flex-shrink-0">
                      <button 
                         onClick={() => setActiveTab('routes')}
-                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors flex items-center justify-center gap-2 ${activeTab === 'routes' ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-800'}`}
+                        className={`flex-1 py-2 text-xs md:text-sm font-bold rounded-lg transition-colors flex items-center justify-center gap-2 ${activeTab === 'routes' ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-800'}`}
                      >
-                        <Settings className="w-4 h-4" /> Route Config
+                        <Settings className="w-4 h-4" /> <span className="hidden sm:inline">Route Config</span><span className="sm:hidden">Route</span>
                      </button>
                      <button 
                         onClick={() => setActiveTab('ports')}
-                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors flex items-center justify-center gap-2 ${activeTab === 'ports' ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-800'}`}
+                        className={`flex-1 py-2 text-xs md:text-sm font-bold rounded-lg transition-colors flex items-center justify-center gap-2 ${activeTab === 'ports' ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-800'}`}
                      >
-                        <Layers className="w-4 h-4" /> Port Manager
+                        <Layers className="w-4 h-4" /> <span className="hidden sm:inline">Port Manager</span><span className="sm:hidden">Port</span>
+                     </button>
+                     <button 
+                        onClick={() => setActiveTab('system')}
+                        className={`flex-1 py-2 text-xs md:text-sm font-bold rounded-lg transition-colors flex items-center justify-center gap-2 ${activeTab === 'system' ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-800'}`}
+                     >
+                        <Shield className="w-4 h-4" /> <span className="hidden sm:inline">System / API</span><span className="sm:hidden">API</span>
                      </button>
                 </div>
 
-                {activeTab === 'routes' ? (
+                {/* --- SYSTEM / API TAB --- */}
+                {activeTab === 'system' && (
+                     <div className="p-4 md:p-6 space-y-6 flex-1 overflow-y-auto">
+                         <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl">
+                             <h3 className="text-sm font-bold text-indigo-800 flex items-center gap-2 mb-2">
+                                 <Key className="w-4 h-4" /> Gemini API Configuration
+                             </h3>
+                             <p className="text-xs text-indigo-600 leading-relaxed">
+                                 Enter your paid Google Gemini API Key here. This connects the dashboard to your real Google Cloud billing account, unlocking higher rate limits and real-time data access.
+                             </p>
+                         </div>
+
+                         <form onSubmit={handleSaveApiKey} className="space-y-4">
+                             <div>
+                                 <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Google Gemini API Key</label>
+                                 <div className="relative">
+                                     <input 
+                                         type={showKey ? "text" : "password"}
+                                         value={apiKey}
+                                         onChange={(e) => setApiKey(e.target.value)}
+                                         className="w-full pl-10 pr-10 py-3 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
+                                         placeholder="AIzaSy..."
+                                     />
+                                     <Shield className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
+                                     <button 
+                                        type="button"
+                                        onClick={() => setShowKey(!showKey)}
+                                        className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                                     >
+                                         {showKey ? 'HIDE' : 'SHOW'}
+                                     </button>
+                                 </div>
+                                 <p className="text-[10px] text-slate-400 mt-2">
+                                     Key is stored locally in your browser (LocalStorage). It is never sent to our servers.
+                                 </p>
+                             </div>
+
+                             <div className="flex gap-3 pt-4">
+                                 <button 
+                                    type="submit"
+                                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg text-sm font-bold shadow-sm transition-transform active:scale-[0.98]"
+                                 >
+                                     Save & Connect
+                                 </button>
+                                 {apiKey && (
+                                     <button 
+                                        type="button"
+                                        onClick={handleClearApiKey}
+                                        className="px-4 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-sm font-bold transition-colors"
+                                     >
+                                         Remove
+                                     </button>
+                                 )}
+                             </div>
+                         </form>
+                         
+                         <div className="border-t border-slate-100 pt-6 mt-6">
+                             <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">System Status</h4>
+                             <div className="space-y-2">
+                                 <div className="flex justify-between items-center text-sm">
+                                     <span className="text-slate-600">API Connection</span>
+                                     <span className={`px-2 py-0.5 rounded text-xs font-bold ${apiKey ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                         {apiKey ? 'Authenticated' : 'Mock / Demo Mode'}
+                                     </span>
+                                 </div>
+                                 <div className="flex justify-between items-center text-sm">
+                                     <span className="text-slate-600">Model Version</span>
+                                     <span className="font-mono text-xs bg-slate-100 px-2 py-0.5 rounded">gemini-2.5-flash</span>
+                                 </div>
+                             </div>
+                         </div>
+                     </div>
+                )}
+
+                {activeTab === 'routes' && (
                     <form onSubmit={handleSaveRoute} className="p-4 md:p-6 space-y-4 md:space-y-5 flex-1 overflow-y-auto">
                         
                         {/* ROUTE MODE TOGGLES */}
@@ -403,7 +508,10 @@ export const AdminSettings: React.FC = () => {
                             </button>
                         </div>
                     </form>
-                ) : (
+                ) : null}
+
+                {/* --- PORT TAB CONTENT (Reuse existing) --- */}
+                {activeTab === 'ports' && (
                     <form onSubmit={handleSavePort} className="p-4 md:p-6 space-y-4 md:space-y-5 flex-1 overflow-y-auto flex flex-col">
                         
                         {/* PORT MODE TOGGLES */}
@@ -553,15 +661,30 @@ export const AdminSettings: React.FC = () => {
             <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-100 flex flex-col order-2 lg:order-2 h-full max-h-[calc(100vh-140px)]">
                 <div className="p-4 md:p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 flex-shrink-0">
                     <h2 className="text-base md:text-lg font-bold text-slate-800">
-                        {activeTab === 'routes' ? 'Active Routes Config' : 'Custom Port Database'}
+                        {activeTab === 'routes' ? 'Active Routes Config' : activeTab === 'ports' ? 'Custom Port Database' : 'System Configuration'}
                     </h2>
-                    <span className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold">
-                        {activeTab === 'routes' ? filteredSavedRoutes.length : filteredSavedPorts.length}
-                    </span>
+                    {activeTab !== 'system' && (
+                        <span className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold">
+                            {activeTab === 'routes' ? filteredSavedRoutes.length : filteredSavedPorts.length}
+                        </span>
+                    )}
                 </div>
                 
                 <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50/30">
-                    {activeTab === 'routes' ? (
+                    {/* SYSTEM RIGHT PANEL CONTENT */}
+                    {activeTab === 'system' && (
+                        <div className="h-full flex flex-col items-center justify-center text-center p-8 text-slate-400">
+                            <Shield className="w-16 h-16 mb-4 text-slate-200" />
+                            <h3 className="text-lg font-bold text-slate-600 mb-2">Secure API Management</h3>
+                            <p className="max-w-md mx-auto text-sm leading-relaxed">
+                                Use the panel on the left to enter your Google Cloud credentials. 
+                                <br/><br/>
+                                <strong className="text-slate-500">Note:</strong> Without a key, the system runs in <span className="bg-amber-100 text-amber-700 px-1 rounded font-bold">Mock Mode</span> to prevent errors. Adding a key unlocks real-time satellite ship tracking, live congestion data, and news feeds.
+                            </p>
+                        </div>
+                    )}
+
+                    {activeTab === 'routes' && (
                         /* ROUTES LIST */
                         filteredSavedRoutes.length === 0 ? (
                             <div className="h-full flex flex-col items-center justify-center text-slate-400 text-center py-8">
@@ -617,7 +740,9 @@ export const AdminSettings: React.FC = () => {
                                 })}
                             </div>
                         )
-                    ) : (
+                    )}
+
+                    {activeTab === 'ports' && (
                         /* PORTS LIST */
                          filteredSavedPorts.length === 0 ? (
                             <div className="h-full flex flex-col items-center justify-center text-slate-400 text-center py-8">

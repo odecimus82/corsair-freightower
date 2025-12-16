@@ -4,13 +4,22 @@ import { Shipment, TransportMode, ShipmentStatus, PortDetails, RouteDetails, ETA
 import { RouteDB } from "./routeStorage";
 
 // Initialize Gemini Client
+// UPDATED: Now checks LocalStorage first for dynamic user input
 const getApiKey = (): string => {
-  // @ts-ignore - Check for Vite environment variable
+  // 1. Check LocalStorage (User entered via Admin UI)
+  if (typeof window !== 'undefined' && window.localStorage) {
+      const stored = window.localStorage.getItem('freightflow_api_key');
+      if (stored && stored.trim().length > 0) return stored;
+  }
+
+  // 2. Check Vite environment variable
+  // @ts-ignore
   if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_KEY) {
     // @ts-ignore
     return import.meta.env.VITE_API_KEY;
   }
-  // Fallback / Standard Node check
+  
+  // 3. Fallback / Standard Node check
   try {
     return process.env.API_KEY || '';
   } catch (e) {
@@ -18,6 +27,8 @@ const getApiKey = (): string => {
   }
 };
 
+// Create a client instance. 
+// Note: If the key changes in localStorage, the app needs a refresh to pick it up.
 const ai = new GoogleGenAI({ apiKey: getApiKey() });
 
 const SYSTEM_INSTRUCTION = `
