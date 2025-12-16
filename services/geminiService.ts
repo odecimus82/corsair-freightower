@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { Shipment, TransportMode, ShipmentStatus, PortDetails, RouteDetails, ETAPrediction } from "../types";
+import { Shipment, TransportMode, ShipmentStatus, PortDetails, RouteDetails, ETAPrediction, LogisticsNewsItem } from "../types";
 import { RouteDB } from "./routeStorage";
 
 // Initialize Gemini Client
@@ -102,6 +102,72 @@ export const generateMarketUpdate = async (): Promise<string> => {
 }
 
 // --- NEW FEATURES ---
+
+// NEW: Fetch Real-time News Feed (Simulated via AI based on real-world patterns)
+export const fetchLogisticsNews = async (): Promise<LogisticsNewsItem[]> => {
+    // Current UTC Hour to help Gemini generate relevant local times
+    const currentHourUTC = new Date().getUTCHours();
+    
+    const prompt = `
+    Generate 6 HIGHLY REALISTIC, "Breaking News" style updates for Global Logistics (Ports & Airports).
+    Assume the current UTC hour is ${currentHourUTC}:00.
+    
+    CRITICAL TIMEZONE INSTRUCTION: 
+    For the 'timestamp' field, use the **LOCAL time** of the specific location mentioned in the news, and MUST include the timezone abbreviation.
+    Examples: 
+    - If news is about Shanghai, timestamp should be "14:30 CST".
+    - If news is about Los Angeles, timestamp should be "23:30 PST".
+    - If news is about Rotterdam, timestamp should be "08:30 CET".
+    
+    Mix:
+    - 2 Major Port Congestion/Updates (e.g. Shanghai, LA, Rotterdam)
+    - 2 Air Freight alerts (e.g. HKG, MEM, FRA)
+    - 1 Weather impact
+    - 1 Customs/Regulatory update
+    
+    Return JSON array.
+    Fields:
+    - id (random string)
+    - timestamp (e.g. "10:32 AM CST")
+    - category (PORT, AIRPORT, WEATHER, CUSTOMS)
+    - location (e.g. "Shanghai (PVG)" or "North Atlantic")
+    - headline (Short, punchy, max 10 words. e.g. "Terminal 3 backlog increases to 48hrs")
+    - impact (LOW, MEDIUM, HIGH)
+    `;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            id: { type: Type.STRING },
+                            timestamp: { type: Type.STRING },
+                            category: { type: Type.STRING, enum: ["PORT", "AIRPORT", "WEATHER", "CUSTOMS"] },
+                            location: { type: Type.STRING },
+                            headline: { type: Type.STRING },
+                            impact: { type: Type.STRING, enum: ["LOW", "MEDIUM", "HIGH"] }
+                        },
+                        required: ["id", "timestamp", "category", "location", "headline", "impact"]
+                    }
+                }
+            }
+        });
+        
+        const text = response.text;
+        if (!text) return [];
+        return JSON.parse(text);
+
+    } catch (e) {
+        console.error("News Feed Error", e);
+        return [];
+    }
+}
 
 export const getPortDetails = async (portName: string): Promise<PortDetails> => {
     const prompt = `
@@ -298,6 +364,9 @@ const fetchRouteFromGemini = async (origin: string, destination: string): Promis
         - distanceNm, transitTimeDays, routeDescription
         - keyWaypoints (strings)
         - waypoints: [{lat, lng}, {lat, lng}...] (The plotting coordinates)
+    - air:
+        - distanceKm, transitTimeHours, routeDescription
+        - waypoints: [{lat, lng}, {lat, lng}...]
     - air:
         - distanceKm, transitTimeHours, routeDescription
         - waypoints: [{lat, lng}, {lat, lng}...]

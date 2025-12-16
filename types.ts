@@ -110,3 +110,12 @@ export interface AppNotification {
     read: boolean;
     type: 'ROUTE' | 'PORT';
 }
+
+export interface LogisticsNewsItem {
+    id: string;
+    timestamp: string; // e.g., "10:45 AM"
+    category: 'PORT' | 'AIRPORT' | 'WEATHER' | 'CUSTOMS';
+    location: string;
+    headline: string;
+    impact: 'LOW' | 'MEDIUM' | 'HIGH';
+}

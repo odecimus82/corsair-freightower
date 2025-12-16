@@ -1,14 +1,15 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Bell, Anchor, Database, Menu, X, Navigation, Search, Check, Trash2, MapPin } from 'lucide-react';
+import { Settings, Bell, Anchor, Database, Menu, X, Navigation, Search, Check, Trash2, MapPin, LayoutDashboard, Radio } from 'lucide-react';
 import { PortIntelligence } from './components/PortIntelligence';
 import { AdminSettings } from './components/AdminSettings';
+import { LiveMarketFeed } from './components/LiveMarketFeed';
 import { NotificationDB } from './services/routeStorage';
 import { AppNotification } from './types';
 
 const App: React.FC = () => {
-  // Updated state to include distinct tabs for ports and calculator
-  const [activeTab, setActiveTab] = useState<'ports' | 'calculator' | 'admin'>('ports');
+  // Updated state to include 'dashboard'
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'ports' | 'calculator' | 'admin'>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Notification State
@@ -19,7 +20,7 @@ const App: React.FC = () => {
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
   const closeSidebar = () => setIsSidebarOpen(false);
 
-  const handleTabChange = (tab: 'ports' | 'calculator' | 'admin') => {
+  const handleTabChange = (tab: 'dashboard' | 'ports' | 'calculator' | 'admin') => {
     setActiveTab(tab);
     closeSidebar();
   };
@@ -32,10 +33,9 @@ const App: React.FC = () => {
       // Initial Load
       loadNotifications();
 
-      // Listen for updates from other components (like AdminSettings)
+      // Listen for updates from other components
       window.addEventListener('freightflow:update', loadNotifications);
       
-      // Close dropdown when clicking outside
       const handleClickOutside = (event: MouseEvent) => {
           if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
               setShowNotifications(false);
@@ -51,11 +51,8 @@ const App: React.FC = () => {
 
   const handleBellClick = () => {
       setShowNotifications(!showNotifications);
-      // Mark as read when opening
       if (!showNotifications && unreadCount > 0) {
           NotificationDB.markAllRead();
-          // We trigger a reload slightly delayed or immediately to update UI "read" state visually
-          // But to keep the "red dot" disappearing logic consistent:
           setTimeout(() => {
              loadNotifications(); 
           }, 500);
@@ -71,6 +68,7 @@ const App: React.FC = () => {
 
   const getPageTitle = () => {
       switch(activeTab) {
+          case 'dashboard': return 'Command Center';
           case 'ports': return 'Global Port Database';
           case 'calculator': return 'Smart Route Calculator';
           case 'admin': return 'System Configuration';
@@ -95,9 +93,8 @@ const App: React.FC = () => {
         md:relative md:translate-x-0 shadow-2xl md:shadow-none
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
-        {/* Sidebar Header with Background Logo Watermark */}
+        {/* Sidebar Header */}
         <div className="h-16 flex items-center justify-between px-6 border-b border-slate-800 relative overflow-hidden group">
-          {/* Watermark Logo */}
           <img 
             src="https://upload.wikimedia.org/wikipedia/commons/a/a2/Corsair_logo_2020.svg" 
             alt="" 
@@ -115,6 +112,15 @@ const App: React.FC = () => {
         <nav className="flex-1 py-6 px-3 space-y-2">
            <div className="px-3 mb-2 text-xs font-bold text-slate-500 uppercase tracking-wider">Logistics Tools</div>
            
+           {/* NEW DASHBOARD TAB */}
+           <button 
+            onClick={() => handleTabChange('dashboard')}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group ${activeTab === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'hover:bg-slate-800 hover:text-white'}`}
+          >
+            <LayoutDashboard className={`w-5 h-5 ${activeTab === 'dashboard' ? 'text-indigo-200' : 'text-slate-400 group-hover:text-white'}`} />
+            Live Dashboard
+          </button>
+
            <button 
             onClick={() => handleTabChange('ports')}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group ${activeTab === 'ports' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'hover:bg-slate-800 hover:text-white'}`}
@@ -178,6 +184,7 @@ const App: React.FC = () => {
                 {/* Dropdown */}
                 {showNotifications && (
                     <div className="absolute right-0 mt-2 w-80 md:w-96 bg-white rounded-xl shadow-xl border border-slate-100 z-50 overflow-hidden ring-1 ring-black/5 animate-in fade-in zoom-in-95 duration-200">
+                        {/* Notification Dropdown Content */}
                         <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                             <h3 className="font-bold text-slate-800">Notifications</h3>
                             {notifications.length > 0 && (
@@ -246,6 +253,55 @@ const App: React.FC = () => {
         {/* Scrollable Area */}
         <div className="flex-1 overflow-y-auto p-4 md:p-8 scrollbar-hide">
           <div className="max-w-7xl mx-auto space-y-8 h-full">
+
+            {/* DASHBOARD (HOME) VIEW */}
+            {activeTab === 'dashboard' && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-full max-h-[800px]">
+                    {/* Left: Live Feed (Takes 1/3) */}
+                    <div className="lg:col-span-1 h-full min-h-[500px]">
+                         <LiveMarketFeed />
+                    </div>
+
+                    {/* Right: Quick Actions / Overview (Takes 2/3) - Placeholder visuals to make dashboard feel complete */}
+                    <div className="lg:col-span-2 flex flex-col gap-6">
+                        <div className="bg-gradient-to-r from-indigo-600 to-blue-600 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -translate-y-1/2 translate-x-1/4"></div>
+                            <div className="relative z-10">
+                                <h2 className="text-3xl font-bold mb-2">Welcome to Corsair Freightflow</h2>
+                                <p className="text-indigo-100 max-w-lg mb-6">Real-time supply chain monitoring active. Global network status is currently stable.</p>
+                                <div className="flex gap-3">
+                                    <button onClick={() => handleTabChange('ports')} className="bg-white text-indigo-600 px-5 py-2.5 rounded-lg font-bold text-sm hover:bg-indigo-50 transition-colors">
+                                        Search Ports
+                                    </button>
+                                    <button onClick={() => handleTabChange('calculator')} className="bg-indigo-700/50 border border-white/20 text-white px-5 py-2.5 rounded-lg font-bold text-sm hover:bg-indigo-700 transition-colors">
+                                        Check Routes
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1">
+                             {/* Placeholder Card 1 */}
+                             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center justify-center text-center group hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleTabChange('ports')}>
+                                <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                                    <Anchor className="w-8 h-8 text-blue-500" />
+                                </div>
+                                <h3 className="font-bold text-slate-800 text-lg">Port Intelligence</h3>
+                                <p className="text-slate-500 text-sm mt-2">Access infrastructure data for 100+ global terminals.</p>
+                             </div>
+
+                             {/* Placeholder Card 2 */}
+                             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center justify-center text-center group hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleTabChange('calculator')}>
+                                <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                                    <Navigation className="w-8 h-8 text-indigo-500" />
+                                </div>
+                                <h3 className="font-bold text-slate-800 text-lg">Route Optimizer</h3>
+                                <p className="text-slate-500 text-sm mt-2">AI-powered distance and transit time calculator.</p>
+                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Port Database View */}
             {activeTab === 'ports' && (
