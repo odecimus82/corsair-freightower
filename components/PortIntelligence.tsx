@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Search, Anchor, Navigation, ArrowRight, MapPin, Info, Ship, Plane, Layers, ChevronDown, Globe, BarChart3, TrendingUp, X, Activity, ExternalLink, Clock, Ruler } from 'lucide-react';
+import { Search, Anchor, Navigation, ArrowRight, MapPin, Info, Ship, Plane, Layers, ChevronDown, Globe, BarChart3, TrendingUp, X, Activity, ExternalLink, Clock, Ruler, Database, Map } from 'lucide-react';
 import { getPortDetails, calculateRouteDetails, getPortCongestion } from '../services/geminiService';
 import { getCombinedTerminals } from '../services/portData';
 import { PortDetails, RouteDetails, TerminalOption } from '../types';
@@ -10,6 +10,12 @@ interface PortIntelligenceProps {
     mode: 'lookup' | 'route';
 }
 
+const POPULAR_ROUTES = [
+    { o: 'Shanghai Port', d: 'Rotterdam Port', type: 'OCEAN', label: 'Shanghai → Rotterdam' },
+    { o: 'Hong Kong International Airport', d: 'Los Angeles International Airport', type: 'AIR', label: 'Hong Kong → Los Angeles' },
+    { o: 'Singapore Port', d: 'Jebel Ali Port', type: 'OCEAN', label: 'Singapore → Dubai' },
+];
+
 export const PortIntelligence: React.FC<PortIntelligenceProps> = ({ mode }) => {
     const [terminals, setTerminals] = useState<TerminalOption[]>([]);
     
@@ -18,6 +24,12 @@ export const PortIntelligence: React.FC<PortIntelligenceProps> = ({ mode }) => {
     const [lookupQuery, setLookupQuery] = useState('');
     const [portData, setPortData] = useState<PortDetails | null>(null);
     const [loadingPort, setLoadingPort] = useState(false);
+
+    // Stats & Random Ticker State
+    const [oceanCount, setOceanCount] = useState(0);
+    const [airCount, setAirCount] = useState(0);
+    const [randomOcean, setRandomOcean] = useState<TerminalOption | null>(null);
+    const [randomAir, setRandomAir] = useState<TerminalOption | null>(null);
 
     // Congestion Modal State
     const [showCongestionModal, setShowCongestionModal] = useState(false);
@@ -32,7 +44,26 @@ export const PortIntelligence: React.FC<PortIntelligenceProps> = ({ mode }) => {
     const [loadingRoute, setLoadingRoute] = useState(false);
 
     useEffect(() => {
-        setTerminals(getCombinedTerminals());
+        const combined = getCombinedTerminals();
+        setTerminals(combined);
+        
+        // Stats Calculation
+        const ocean = combined.filter(t => t.type === 'OCEAN');
+        const air = combined.filter(t => t.type === 'AIR');
+        setOceanCount(ocean.length);
+        setAirCount(air.length);
+
+        // Initial Random Selection
+        if (ocean.length) setRandomOcean(ocean[Math.floor(Math.random() * ocean.length)]);
+        if (air.length) setRandomAir(air[Math.floor(Math.random() * air.length)]);
+
+        // Random Ticker Interval
+        const interval = setInterval(() => {
+             if (ocean.length) setRandomOcean(ocean[Math.floor(Math.random() * ocean.length)]);
+             if (air.length) setRandomAir(air[Math.floor(Math.random() * air.length)]);
+        }, 5000);
+
+        return () => clearInterval(interval);
     }, []);
 
     // Clear selection when switching modes
@@ -50,6 +81,13 @@ export const PortIntelligence: React.FC<PortIntelligenceProps> = ({ mode }) => {
         setRouteData(null);
     };
 
+    // Quick Load Helper
+    const loadQuickRoute = (r: any) => {
+        setRouteCalcMode(r.type);
+        setOriginQuery(r.o);
+        setDestQuery(r.d);
+    };
+
     // Fixed: Now accepts an optional override string to handle click events immediately
     // without waiting for the async React state update of 'lookupQuery'.
     const handleLookup = async (e?: React.FormEvent, override?: string) => {
@@ -58,7 +96,14 @@ export const PortIntelligence: React.FC<PortIntelligenceProps> = ({ mode }) => {
         const query = override || lookupQuery;
         
         // Ensure UI stays in sync if we used a quick link
-        if (override) setLookupQuery(override);
+        if (override) {
+            setLookupQuery(override);
+            // Auto-switch mode if the clicked item doesn't match current mode
+            const target = terminals.find(t => t.value === override);
+            if (target && target.type !== searchMode) {
+                setSearchMode(target.type as 'OCEAN' | 'AIR');
+            }
+        }
 
         if (!query) return;
         
@@ -106,7 +151,6 @@ export const PortIntelligence: React.FC<PortIntelligenceProps> = ({ mode }) => {
 
     // --- VIEW: PORT DATABASE ---
     if (mode === 'lookup') {
-        // (Existing Lookup View Code remains the same)
         return (
             <div className="flex flex-col gap-6 max-w-5xl mx-auto">
                 {/* Hero Search Section */}
@@ -115,11 +159,25 @@ export const PortIntelligence: React.FC<PortIntelligenceProps> = ({ mode }) => {
                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500"></div>
                     
                     <div className="relative z-10">
-                        <h2 className="text-3xl font-bold text-slate-800 mb-3 tracking-tight">Global Port Intelligence</h2>
-                        <p className="text-slate-500 mb-6 max-w-lg mx-auto text-lg font-light">
-                            Access real-time infrastructure data, coordinates, and AI-driven capacity analysis.
-                        </p>
+                        <div className="flex items-center justify-center gap-2 mb-2">
+                             <span className="px-3 py-1 bg-slate-100 rounded-full text-[10px] font-bold text-slate-500 uppercase tracking-widest border border-slate-200">
+                                Freightflow Intelligence
+                             </span>
+                        </div>
+                        <h2 className="text-3xl font-bold text-slate-800 mb-2 tracking-tight">Global Port Database</h2>
                         
+                        {/* Database Counters */}
+                        <div className="flex justify-center gap-3 mb-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                             <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-700 rounded-lg text-xs font-bold border border-blue-100">
+                                <Ship className="w-3.5 h-3.5" />
+                                <span>{oceanCount} Seaports</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold border border-indigo-100">
+                                <Plane className="w-3.5 h-3.5" />
+                                <span>{airCount} Airports</span>
+                            </div>
+                        </div>
+
                         <div className="max-w-xl mx-auto space-y-4">
                             {/* Mode Switcher Slider */}
                             <div className="inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner">
@@ -156,7 +214,7 @@ export const PortIntelligence: React.FC<PortIntelligenceProps> = ({ mode }) => {
                                         onChange={(e) => setLookupQuery(e.target.value)}
                                     >
                                         <option value="" disabled>
-                                            {searchMode === 'OCEAN' ? 'Select a Seaport...' : 'Select an International Airport...'}
+                                            {searchMode === 'OCEAN' ? 'Search Seaport Name or Code...' : 'Search Airport Name or Code...'}
                                         </option>
                                         
                                         {/* Filtered Options based on Toggle */}
@@ -230,6 +288,13 @@ export const PortIntelligence: React.FC<PortIntelligenceProps> = ({ mode }) => {
                                         >
                                             <Activity className="w-4 h-4 text-emerald-400 group-hover:animate-pulse" />
                                             Live Congestion
+                                        </button>
+                                        <button 
+                                            onClick={() => setPortData(null)}
+                                            className="bg-white/10 hover:bg-white/20 border border-white/20 backdrop-blur-sm text-white p-3 rounded-xl transition-all"
+                                            title="Clear Search"
+                                        >
+                                            <X className="w-4 h-4" />
                                         </button>
                                     </div>
                                 </div>
@@ -361,34 +426,95 @@ export const PortIntelligence: React.FC<PortIntelligenceProps> = ({ mode }) => {
 
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            {[
-                                { name: 'Shanghai', code: 'CNSHA', value: 'Shanghai Port' },
-                                { name: 'Rotterdam', code: 'NLRTM', value: 'Rotterdam Port' },
-                                { name: 'Los Angeles', code: 'USLAX', value: 'Port of Los Angeles' },
-                            ].map((port) => (
-                                <button 
-                                    key={port.code}
-                                    onClick={() => handleLookup(undefined, port.value)}
-                                    className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-lg hover:border-indigo-300 transition-all text-left group relative overflow-hidden"
-                                >
-                                    <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                                        <Anchor className="w-24 h-24 transform rotate-12 translate-x-4 -translate-y-4" />
-                                    </div>
-                                    <div className="relative z-10">
-                                        <div className="flex justify-between items-start mb-4">
-                                            <div className="p-3 bg-slate-50 rounded-xl text-slate-500 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
-                                                <Anchor className="w-6 h-6" />
+                        <div className="flex flex-col gap-8">
+                             {/* Static Quick Links */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                {[
+                                    { name: 'Shanghai', code: 'CNSHA', value: 'Shanghai Port' },
+                                    { name: 'Rotterdam', code: 'NLRTM', value: 'Rotterdam Port' },
+                                    { name: 'Los Angeles', code: 'USLAX', value: 'Port of Los Angeles' },
+                                ].map((port) => (
+                                    <button 
+                                        key={port.code}
+                                        onClick={() => handleLookup(undefined, port.value)}
+                                        className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-lg hover:border-indigo-300 transition-all text-left group relative overflow-hidden"
+                                    >
+                                        <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                                            <Anchor className="w-24 h-24 transform rotate-12 translate-x-4 -translate-y-4" />
+                                        </div>
+                                        <div className="relative z-10">
+                                            <div className="flex justify-between items-start mb-4">
+                                                <div className="p-3 bg-slate-50 rounded-xl text-slate-500 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
+                                                    <Anchor className="w-6 h-6" />
+                                                </div>
+                                                <span className="text-xs font-mono bg-slate-100 px-2 py-1 rounded text-slate-500 border border-slate-200">{port.code}</span>
                                             </div>
-                                            <span className="text-xs font-mono bg-slate-100 px-2 py-1 rounded text-slate-500 border border-slate-200">{port.code}</span>
+                                            <h4 className="font-bold text-slate-800 text-lg mb-1">{port.name}</h4>
+                                            <div className="flex items-center gap-1 text-sm text-indigo-600 font-medium opacity-0 group-hover:opacity-100 transition-opacity transform translate-y-2 group-hover:translate-y-0">
+                                                View Details <ArrowRight className="w-4 h-4" />
+                                            </div>
                                         </div>
-                                        <h4 className="font-bold text-slate-800 text-lg mb-1">{port.name}</h4>
-                                        <div className="flex items-center gap-1 text-sm text-indigo-600 font-medium opacity-0 group-hover:opacity-100 transition-opacity transform translate-y-2 group-hover:translate-y-0">
-                                            View Details <ArrowRight className="w-4 h-4" />
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Network Spotlight - Randomly Rotating */}
+                            <div className="pt-8 border-t border-slate-200/60">
+                                <div className="flex items-center justify-between mb-4">
+                                     <div className="flex items-center gap-2 text-slate-400 text-xs font-bold uppercase tracking-wider">
+                                        <Activity className="w-4 h-4 text-emerald-500" /> Live Network Spotlight
+                                    </div>
+                                    <div className="flex gap-1">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-slate-200 animate-pulse"></div>
+                                        <div className="w-1.5 h-1.5 rounded-full bg-slate-200 animate-pulse delay-75"></div>
+                                        <div className="w-1.5 h-1.5 rounded-full bg-slate-200 animate-pulse delay-150"></div>
+                                    </div>
+                                </div>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {/* Random Ocean Card */}
+                                    <div 
+                                        onClick={() => randomOcean && handleLookup(undefined, randomOcean.value)}
+                                        className="bg-white rounded-xl p-5 border border-slate-200 flex items-center gap-5 group hover:bg-blue-50/30 hover:border-blue-200 transition-all cursor-pointer relative overflow-hidden"
+                                    >
+                                        <div className="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600 group-hover:scale-110 group-hover:rotate-3 transition-transform shadow-sm">
+                                            <Ship className="w-7 h-7" />
+                                        </div>
+                                        <div className="flex-1 min-w-0 z-10">
+                                            <div className="text-[10px] font-bold text-blue-500 uppercase mb-0.5 tracking-wide">Featured Seaport</div>
+                                            <div className="font-bold text-slate-800 text-lg truncate group-hover:text-blue-700 transition-colors">{randomOcean?.label.split(' - ')[0]}</div>
+                                            <div className="text-xs text-slate-500 flex items-center gap-1.5 mt-1">
+                                                <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 border border-slate-200">{randomOcean?.value.includes('(') ? randomOcean.value.split('(')[1].replace(')', '') : 'CODE'}</span>
+                                                <span className="truncate">{randomOcean?.country}</span>
+                                            </div>
+                                        </div>
+                                        <div className="bg-slate-50 p-2 rounded-full group-hover:bg-blue-200 group-hover:text-blue-700 transition-colors">
+                                            <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-blue-700" />
                                         </div>
                                     </div>
-                                </button>
-                            ))}
+
+                                    {/* Random Air Card */}
+                                    <div 
+                                        onClick={() => randomAir && handleLookup(undefined, randomAir.value)}
+                                        className="bg-white rounded-xl p-5 border border-slate-200 flex items-center gap-5 group hover:bg-indigo-50/30 hover:border-indigo-200 transition-all cursor-pointer relative overflow-hidden"
+                                    >
+                                         <div className="w-14 h-14 bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-600 group-hover:scale-110 group-hover:-rotate-3 transition-transform shadow-sm">
+                                            <Plane className="w-7 h-7" />
+                                        </div>
+                                         <div className="flex-1 min-w-0 z-10">
+                                            <div className="text-[10px] font-bold text-indigo-500 uppercase mb-0.5 tracking-wide">Featured Airport</div>
+                                            <div className="font-bold text-slate-800 text-lg truncate group-hover:text-indigo-700 transition-colors">{randomAir?.label.split(' - ')[0]}</div>
+                                            <div className="text-xs text-slate-500 flex items-center gap-1.5 mt-1">
+                                                <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 border border-slate-200">{randomAir?.value.includes('(') ? randomAir.value.split('(')[1].replace(')', '') : 'CODE'}</span>
+                                                <span className="truncate">{randomAir?.country}</span>
+                                            </div>
+                                        </div>
+                                        <div className="bg-slate-50 p-2 rounded-full group-hover:bg-indigo-200 group-hover:text-indigo-700 transition-colors">
+                                            <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-indigo-700" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -432,11 +558,17 @@ export const PortIntelligence: React.FC<PortIntelligenceProps> = ({ mode }) => {
                         </div>
                         
                         <form onSubmit={handleRouteCalc} className="space-y-6">
-                            <div className="relative pl-4 border-l-2 border-slate-100 space-y-6">
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">Origin {routeCalcMode === 'OCEAN' ? 'Port' : 'Airport'}</label>
-                                    <div className="relative group">
-                                        <div className={`absolute -left-[21px] top-3 w-3 h-3 rounded-full bg-white border-2 z-10 ${routeCalcMode === 'OCEAN' ? 'border-blue-500' : 'border-indigo-500'}`}></div>
+                            {/* Visual Timeline Connector */}
+                            <div className="relative pl-6 space-y-8">
+                                {/* Vertical Line */}
+                                <div className="absolute left-[11px] top-6 bottom-6 w-0.5 bg-slate-200"></div>
+
+                                <div className="relative">
+                                     {/* Dot */}
+                                     <div className={`absolute -left-[20px] top-3.5 w-4 h-4 rounded-full bg-white border-2 z-10 ${routeCalcMode === 'OCEAN' ? 'border-blue-500' : 'border-indigo-500'}`}></div>
+                                     
+                                     <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">Origin {routeCalcMode === 'OCEAN' ? 'Port' : 'Airport'}</label>
+                                     <div className="relative group">
                                         <select 
                                             className="w-full pl-3 pr-8 py-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all cursor-pointer appearance-none"
                                             value={originQuery}
@@ -451,10 +583,12 @@ export const PortIntelligence: React.FC<PortIntelligenceProps> = ({ mode }) => {
                                     </div>
                                 </div>
                                 
-                                <div>
+                                <div className="relative">
+                                     {/* Dot */}
+                                     <div className={`absolute -left-[20px] top-3.5 w-4 h-4 rounded-full border-2 border-white shadow-sm z-10 ${routeCalcMode === 'OCEAN' ? 'bg-blue-600' : 'bg-indigo-600'}`}></div>
+                                    
                                     <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">Destination {routeCalcMode === 'OCEAN' ? 'Port' : 'Airport'}</label>
                                     <div className="relative group">
-                                        <div className={`absolute -left-[21px] top-3 w-3 h-3 rounded-full border-2 border-white shadow-sm z-10 ${routeCalcMode === 'OCEAN' ? 'bg-blue-600' : 'bg-indigo-600'}`}></div>
                                         <select 
                                             className="w-full pl-3 pr-8 py-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all cursor-pointer appearance-none"
                                             value={destQuery}
@@ -615,16 +749,48 @@ export const PortIntelligence: React.FC<PortIntelligenceProps> = ({ mode }) => {
                              </div>
                         </div>
                     ) : (
-                        <div className="h-full bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center text-slate-400 text-sm text-center py-12 min-h-[500px] relative overflow-hidden">
-                            <div className="absolute inset-0 bg-slate-50/50" style={{backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '24px 24px', opacity: 0.3}}></div>
-                            <div className="relative z-10 bg-white p-8 rounded-3xl shadow-lg shadow-slate-200 border border-slate-100 max-w-sm">
-                                <div className="bg-gradient-to-br from-blue-500 to-indigo-600 w-16 h-16 rounded-2xl flex items-center justify-center mb-6 mx-auto shadow-lg shadow-indigo-200">
-                                    <TrendingUp className="w-8 h-8 text-white" />
+                        <div className="h-full bg-slate-50/50 rounded-2xl border border-slate-200 p-8 flex flex-col items-center justify-center relative overflow-hidden group">
+                            {/* Background Map Decoration */}
+                            <div className="absolute inset-0 opacity-5 pointer-events-none" style={{
+                                backgroundImage: 'url("https://upload.wikimedia.org/wikipedia/commons/8/80/World_map_-_low_resolution.svg")',
+                                backgroundRepeat: 'no-repeat',
+                                backgroundPosition: 'center',
+                                backgroundSize: 'contain'
+                            }}></div>
+                            
+                            <div className="relative z-10 max-w-md w-full animate-in fade-in zoom-in-95 duration-500">
+                                <div className="bg-white p-8 rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 text-center">
+                                    <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-6 relative">
+                                         <Globe className="w-10 h-10 text-indigo-600" />
+                                         <div className="absolute inset-0 border-4 border-indigo-100 rounded-full animate-ping opacity-20"></div>
+                                    </div>
+                                    
+                                    <h3 className="text-2xl font-bold text-slate-800 mb-3">Global Route Planner</h3>
+                                    <p className="text-slate-500 mb-8 leading-relaxed">
+                                        Analyze transit times, distances, and carbon efficiency across 400+ trade lanes.
+                                    </p>
+                        
+                                    <div className="space-y-3">
+                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Quick Load Popular Lanes</p>
+                                        <div className="grid grid-cols-1 gap-2">
+                                            {POPULAR_ROUTES.map((r, idx) => (
+                                                <button 
+                                                    key={idx}
+                                                    onClick={() => loadQuickRoute(r)}
+                                                    className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-indigo-300 hover:bg-indigo-50 transition-all group/btn text-left"
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`p-2 rounded-lg ${r.type === 'OCEAN' ? 'bg-blue-100 text-blue-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                                                            {r.type === 'OCEAN' ? <Ship className="w-4 h-4" /> : <Plane className="w-4 h-4" />}
+                                                        </div>
+                                                        <span className="text-sm font-semibold text-slate-700">{r.label}</span>
+                                                    </div>
+                                                    <ArrowRight className="w-4 h-4 text-slate-300 group-hover/btn:text-indigo-600 group-hover/btn:translate-x-1 transition-all" />
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
                                 </div>
-                                <h3 className="text-xl font-bold text-slate-800 mb-2">Ready to Calculate</h3>
-                                <p className="text-slate-500 mb-6 leading-relaxed">
-                                    Select an origin and destination to view comprehensive multi-modal routing analysis powered by Gemini AI.
-                                </p>
                             </div>
                         </div>
                     )}

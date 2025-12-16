@@ -354,7 +354,7 @@ const App: React.FC = () => {
                                     </div>
                                     <h3 className="font-bold text-slate-800 text-lg group-hover:text-indigo-600 transition-colors">Route Optimizer</h3>
                                     <p className="text-slate-500 text-sm mt-2 leading-relaxed">
-                                        AI-powered calculator for distance, transit time, and multi-modal path planning.
+                                        Network big data for distance, transit time, and multi-modal path planning.
                                     </p>
                                 </div>
 
