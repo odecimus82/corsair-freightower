@@ -553,7 +553,7 @@ export const AdminSettings: React.FC = () => {
                             </button>
                         </div>
                     </form>
-                ) : null}
+                )}
 
                 {/* --- PORT TAB CONTENT (Reuse existing) --- */}
                 {activeTab === 'ports' && (
