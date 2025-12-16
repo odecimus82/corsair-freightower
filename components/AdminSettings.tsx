@@ -13,7 +13,7 @@ export const AdminSettings: React.FC = () => {
     const [savedRoutes, setSavedRoutes] = useState<RouteOverride[]>([]);
     const [terminals, setTerminals] = useState<TerminalOption[]>([]);
     
-    // Mode Separation State
+    // Mode Separation State (Routes)
     const [routeConfigMode, setRouteConfigMode] = useState<'OCEAN' | 'AIR'>('OCEAN');
 
     const [origin, setOrigin] = useState('');
@@ -33,10 +33,12 @@ export const AdminSettings: React.FC = () => {
     const [savedPorts, setSavedPorts] = useState<TerminalOption[]>([]); 
     const [portMode, setPortMode] = useState<'create' | 'edit'>('edit'); 
     
+    // Mode Separation State (Ports)
+    const [portConfigMode, setPortConfigMode] = useState<'OCEAN' | 'AIR'>('OCEAN');
+
     const [portName, setPortName] = useState('');
     const [portCode, setPortCode] = useState('');
     const [portCountry, setPortCountry] = useState('');
-    const [portType, setPortType] = useState<'OCEAN' | 'AIR'>('OCEAN');
     const [editingPortValue, setEditingPortValue] = useState<string | null>(null);
 
     useEffect(() => {
@@ -53,7 +55,6 @@ export const AdminSettings: React.FC = () => {
     
     const handleRouteModeChange = (mode: 'OCEAN' | 'AIR') => {
         setRouteConfigMode(mode);
-        // Reset selection when switching modes to prevent "Shanghai Port -> Heathrow Airport" logic errors
         setOrigin('');
         setDestination('');
         setOceanDist(0);
@@ -65,9 +66,6 @@ export const AdminSettings: React.FC = () => {
     const fetchRouteEstimates = async (o: string, d: string) => {
         if (!o || !d) return;
 
-        // CRITICAL FIX: Check local DB first! 
-        // If the user selects a route that is already saved, load it immediately.
-        // Do NOT call AI to overwrite what the user manually saved.
         const existingRoute = RouteDB.get(o, d);
         if (existingRoute) {
              if (routeConfigMode === 'OCEAN') {
@@ -77,11 +75,10 @@ export const AdminSettings: React.FC = () => {
                  setAirDist(existingRoute.airDistance);
                  setAirTime(existingRoute.airTime);
              }
-             return; // Stop here, do not fetch from AI
+             return; 
         }
 
         setIsFetchingRoute(true);
-        // Reset current fields slightly to show loading effect
         if (routeConfigMode === 'OCEAN') { setOceanDist(0); setOceanTime(''); }
         if (routeConfigMode === 'AIR') { setAirDist(0); setAirTime(''); }
         
@@ -115,8 +112,6 @@ export const AdminSettings: React.FC = () => {
         e.preventDefault();
         if (!origin || !destination) return;
 
-        // When saving, we only populate the fields relevant to the current mode.
-        // The other fields are set to 0/empty to indicate they are not valid for this specific origin-dest pair.
         const newRoute: RouteOverride = {
             id: `${origin}-${destination}`,
             origin,
@@ -140,9 +135,6 @@ export const AdminSettings: React.FC = () => {
     };
 
     const handleEditRoute = (route: RouteOverride) => {
-        // Determine mode based on which data is populated
-        // This is a heuristic: if airDistance > 0 it's likely air, otherwise ocean
-        // Or check the terminal type of the origin
         const originTerminal = terminals.find(t => t.value === route.origin);
         const mode = originTerminal ? originTerminal.type : (route.airDistance > 0 ? 'AIR' : 'OCEAN');
 
@@ -165,26 +157,26 @@ export const AdminSettings: React.FC = () => {
         setAirTime('');
     };
 
-    // --- LIST FILTERING LOGIC ---
-    // Filter the displayed routes based on the current mode (OCEAN or AIR)
+    // --- LIST FILTERING LOGIC (Routes) ---
     const filteredSavedRoutes = savedRoutes.filter(route => {
-        // 1. Try to identify the mode based on the Origin Terminal type
         const originTerminal = terminals.find(t => t.value === route.origin);
         if (originTerminal) {
             return originTerminal.type === routeConfigMode;
         }
-        
-        // 2. Fallback for legacy data (if terminal not found): check metrics
         if (routeConfigMode === 'OCEAN') return route.oceanDistance > 0;
         if (routeConfigMode === 'AIR') return route.airDistance > 0;
-        
         return false;
     });
 
     // --- PORT HANDLERS ---
-    // (Existing Port Handlers remain unchanged)
-    const handleModeSwitch = (mode: 'create' | 'edit') => {
+    
+    const handlePortModeSwitch = (mode: 'create' | 'edit') => {
         setPortMode(mode);
+        resetPortForm();
+    };
+
+    const handlePortConfigModeChange = (mode: 'OCEAN' | 'AIR') => {
+        setPortConfigMode(mode);
         resetPortForm();
     };
 
@@ -197,7 +189,7 @@ export const AdminSettings: React.FC = () => {
         const newPort: TerminalOption = {
             label: `${portName} (${portCode || 'Custom'}) - ${portCountry}`,
             value: formattedValue,
-            type: portType,
+            type: portConfigMode, // Use current mode context
             country: portCountry,
             code: portCode
         };
@@ -230,7 +222,7 @@ export const AdminSettings: React.FC = () => {
             setPortName(rawName);
             setPortCode(target.code || '');
             setPortCountry(target.country);
-            setPortType(target.type);
+            setPortConfigMode(target.type); // Sync mode
             setEditingPortValue(target.value);
         }
     };
@@ -247,9 +239,11 @@ export const AdminSettings: React.FC = () => {
         setPortName('');
         setPortCode('');
         setPortCountry('');
-        setPortType('OCEAN');
         setEditingPortValue(null);
     };
+
+    // --- LIST FILTERING LOGIC (Ports) ---
+    const filteredSavedPorts = savedPorts.filter(p => p.type === portConfigMode);
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-full">
@@ -274,7 +268,7 @@ export const AdminSettings: React.FC = () => {
                 {activeTab === 'routes' ? (
                     <form onSubmit={handleSaveRoute} className="p-4 md:p-6 space-y-4 md:space-y-5 flex-1 overflow-y-auto">
                         
-                        {/* MODE TOGGLES */}
+                        {/* ROUTE MODE TOGGLES */}
                         <div className="bg-slate-100 p-1 rounded-lg flex gap-1">
                             <button
                                 type="button"
@@ -411,18 +405,37 @@ export const AdminSettings: React.FC = () => {
                     </form>
                 ) : (
                     <form onSubmit={handleSavePort} className="p-4 md:p-6 space-y-4 md:space-y-5 flex-1 overflow-y-auto flex flex-col">
-                         {/* (Port Form Content Same as before) */}
-                        <div className="bg-slate-100 p-1 rounded-lg flex gap-1 mb-2">
+                        
+                        {/* PORT MODE TOGGLES */}
+                         <div className="bg-slate-100 p-1 rounded-lg flex gap-1 mb-2">
                             <button
                                 type="button"
-                                onClick={() => handleModeSwitch('create')}
-                                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-xs font-bold transition-all ${portMode === 'create' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                onClick={() => handlePortConfigModeChange('OCEAN')}
+                                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-md text-xs font-bold transition-all ${portConfigMode === 'OCEAN' ? 'bg-white text-blue-600 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                <Anchor className="w-4 h-4" /> Ocean Ports
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handlePortConfigModeChange('AIR')}
+                                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-md text-xs font-bold transition-all ${portConfigMode === 'AIR' ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                <Plane className="w-4 h-4" /> Airports
+                            </button>
+                        </div>
+
+                        {/* CREATE/EDIT TOGGLES */}
+                        <div className="bg-slate-50 border border-slate-100 p-1 rounded-lg flex gap-1 mb-2">
+                            <button
+                                type="button"
+                                onClick={() => handlePortModeSwitch('create')}
+                                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-xs font-bold transition-all ${portMode === 'create' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                             >
                                 <Plus className="w-3 h-3" /> Create New
                             </button>
                             <button
                                 type="button"
-                                onClick={() => handleModeSwitch('edit')}
+                                onClick={() => handlePortModeSwitch('edit')}
                                 className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-xs font-bold transition-all ${portMode === 'edit' ? 'bg-white text-amber-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                             >
                                 <Edit3 className="w-3 h-3" /> Edit Existing
@@ -431,23 +444,27 @@ export const AdminSettings: React.FC = () => {
 
                         {portMode === 'edit' && (
                             <div className="animate-in slide-in-from-top-2 duration-300">
-                                <label className="block text-xs font-medium text-slate-700 mb-1">Select Port to Modify</label>
+                                <label className="block text-xs font-medium text-slate-700 mb-1">Select {portConfigMode === 'OCEAN' ? 'Port' : 'Airport'} to Modify</label>
                                 <select 
                                     value={editingPortValue || ''} 
                                     onChange={(e) => handleSelectPortToEdit(e.target.value)}
                                     className="w-full p-2 border border-slate-200 rounded text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-shadow text-slate-700"
                                 >
-                                    <option value="">-- Search / Select Port --</option>
+                                    <option value="">-- Search / Select {portConfigMode === 'OCEAN' ? 'Port' : 'Airport'} --</option>
                                     {savedPorts.length > 0 && (
-                                        <optgroup label="Custom Ports">
-                                            {savedPorts.map(p => (
+                                        <optgroup label="Custom Locations">
+                                            {/* FILTER EDIT DROPDOWN BY MODE */}
+                                            {savedPorts
+                                                .filter(p => p.type === portConfigMode)
+                                                .map(p => (
                                                 <option key={p.value} value={p.value}>{p.label}</option>
                                             ))}
                                         </optgroup>
                                     )}
                                     <optgroup label="Global Database">
+                                        {/* FILTER EDIT DROPDOWN BY MODE */}
                                         {terminals
-                                            .filter(t => !savedPorts.some(sp => sp.value === t.value)) 
+                                            .filter(t => !savedPorts.some(sp => sp.value === t.value) && t.type === portConfigMode) 
                                             .map(p => (
                                                 <option key={p.value} value={p.value}>{p.label}</option>
                                             ))
@@ -459,19 +476,19 @@ export const AdminSettings: React.FC = () => {
                         
                         {portMode === 'create' && (
                              <div className="bg-blue-50 border border-blue-100 p-3 rounded-lg text-xs text-blue-800 animate-in slide-in-from-top-2 duration-300">
-                                Enter details below to add a brand new private warehouse or port location.
+                                Enter details below to add a brand new private warehouse or {portConfigMode === 'OCEAN' ? 'sea port' : 'airport'} location.
                             </div>
                         )}
 
                         <div className="border-t border-slate-100 my-1"></div>
 
                         <div>
-                            <label className="block text-xs font-medium text-slate-700 mb-1">Port / Airport Name</label>
+                            <label className="block text-xs font-medium text-slate-700 mb-1">{portConfigMode === 'OCEAN' ? 'Seaport' : 'Airport'} Name</label>
                             <input 
                                 type="text" 
                                 value={portName} onChange={e => setPortName(e.target.value)}
                                 className="w-full p-2 border border-slate-200 rounded text-sm focus:border-indigo-500 outline-none transition-colors"
-                                placeholder="e.g. My Private Warehouse"
+                                placeholder={portConfigMode === 'OCEAN' ? "e.g. My Private Port" : "e.g. My Private Airstrip"}
                                 required
                             />
                         </div>
@@ -524,7 +541,7 @@ export const AdminSettings: React.FC = () => {
                                     className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-bold transition-colors shadow-sm"
                                 >
                                     <Plus className="w-4 h-4" /> 
-                                    Add New Port
+                                    Add New {portConfigMode === 'OCEAN' ? 'Port' : 'Airport'}
                                 </button>
                             )}
                         </div>
@@ -539,7 +556,7 @@ export const AdminSettings: React.FC = () => {
                         {activeTab === 'routes' ? 'Active Routes Config' : 'Custom Port Database'}
                     </h2>
                     <span className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold">
-                        {activeTab === 'routes' ? filteredSavedRoutes.length : savedPorts.length}
+                        {activeTab === 'routes' ? filteredSavedRoutes.length : filteredSavedPorts.length}
                     </span>
                 </div>
                 
@@ -602,16 +619,15 @@ export const AdminSettings: React.FC = () => {
                         )
                     ) : (
                         /* PORTS LIST */
-                        // (Existing Ports List rendering remains same)
-                         savedPorts.length === 0 ? (
+                         filteredSavedPorts.length === 0 ? (
                             <div className="h-full flex flex-col items-center justify-center text-slate-400 text-center py-8">
                                 <Anchor className="w-12 h-12 mb-3 text-slate-200" />
-                                <p>No custom ports saved.</p>
-                                <p className="text-xs mt-2 text-slate-400">Add a new port or edit a global one to see it here.</p>
+                                <p>No custom {portConfigMode === 'OCEAN' ? 'Ocean' : 'Air'} ports saved.</p>
+                                <p className="text-xs mt-2 text-slate-400">Switch mode or add a new port to see it here.</p>
                             </div>
                         ) : (
                             <div className="grid gap-3">
-                                {savedPorts.map((port) => (
+                                {filteredSavedPorts.map((port) => (
                                     <div key={port.value} className={`bg-white p-4 rounded-lg border shadow-sm flex justify-between items-center group ${editingPortValue === port.value ? 'border-amber-400 ring-1 ring-amber-400' : 'border-slate-200'}`}>
                                         <div className="flex items-center gap-3">
                                             <div className={`p-2 rounded-full ${port.type === 'OCEAN' ? 'bg-blue-100 text-blue-600' : 'bg-indigo-100 text-indigo-600'}`}>
