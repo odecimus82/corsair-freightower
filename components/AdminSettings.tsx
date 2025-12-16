@@ -117,11 +117,6 @@ export const AdminSettings: React.FC = () => {
 
         // When saving, we only populate the fields relevant to the current mode.
         // The other fields are set to 0/empty to indicate they are not valid for this specific origin-dest pair.
-        // HOWEVER, if we are updating an existing record, we should try to preserve the OTHER mode's data if it exists?
-        // Current logic: strict separation. If I save Ocean, I don't care about Air for this specific O-D pair 
-        // because we prevent mixing types now. So overwriting with 0 for the other mode is actually correct 
-        // to keep the DB clean for the "Mode Separation" logic.
-        
         const newRoute: RouteOverride = {
             id: `${origin}-${destination}`,
             origin,
@@ -169,6 +164,22 @@ export const AdminSettings: React.FC = () => {
         setAirDist(0);
         setAirTime('');
     };
+
+    // --- LIST FILTERING LOGIC ---
+    // Filter the displayed routes based on the current mode (OCEAN or AIR)
+    const filteredSavedRoutes = savedRoutes.filter(route => {
+        // 1. Try to identify the mode based on the Origin Terminal type
+        const originTerminal = terminals.find(t => t.value === route.origin);
+        if (originTerminal) {
+            return originTerminal.type === routeConfigMode;
+        }
+        
+        // 2. Fallback for legacy data (if terminal not found): check metrics
+        if (routeConfigMode === 'OCEAN') return route.oceanDistance > 0;
+        if (routeConfigMode === 'AIR') return route.airDistance > 0;
+        
+        return false;
+    });
 
     // --- PORT HANDLERS ---
     // (Existing Port Handlers remain unchanged)
@@ -488,26 +499,6 @@ export const AdminSettings: React.FC = () => {
                             </div>
                         </div>
 
-                         <div>
-                            <label className="block text-xs font-medium text-slate-700 mb-1">Terminal Type</label>
-                            <div className="grid grid-cols-2 gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setPortType('OCEAN')}
-                                    className={`p-2 rounded text-sm border transition-colors ${portType === 'OCEAN' ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'}`}
-                                >
-                                    Ocean Port
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setPortType('AIR')}
-                                    className={`p-2 rounded text-sm border transition-colors ${portType === 'AIR' ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'}`}
-                                >
-                                    Airport
-                                </button>
-                            </div>
-                        </div>
-
                          <div className="pt-4 mt-auto">
                             {portMode === 'edit' ? (
                                 <div className="flex gap-2">
@@ -548,31 +539,26 @@ export const AdminSettings: React.FC = () => {
                         {activeTab === 'routes' ? 'Active Routes Config' : 'Custom Port Database'}
                     </h2>
                     <span className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold">
-                        {activeTab === 'routes' ? savedRoutes.length : savedPorts.length}
+                        {activeTab === 'routes' ? filteredSavedRoutes.length : savedPorts.length}
                     </span>
                 </div>
                 
                 <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50/30">
                     {activeTab === 'routes' ? (
                         /* ROUTES LIST */
-                        savedRoutes.length === 0 ? (
+                        filteredSavedRoutes.length === 0 ? (
                             <div className="h-full flex flex-col items-center justify-center text-slate-400 text-center py-8">
                                 <Database className="w-12 h-12 mb-3 text-slate-200" />
-                                <p>No custom routes.</p>
+                                <p>No {routeConfigMode === 'OCEAN' ? 'Ocean' : 'Air'} routes configured.</p>
                             </div>
                         ) : (
                             <div className="grid gap-4">
-                                {savedRoutes.map((route) => {
-                                    // Determine if this is an Ocean-only, Air-only, or Mixed record (legacy)
-                                    const isOcean = route.oceanDistance > 0;
-                                    const isAir = route.airDistance > 0;
-                                    
+                                {filteredSavedRoutes.map((route) => {
                                     return (
                                         <div key={route.id} className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm hover:shadow-md transition-shadow group relative">
                                             <div className="flex flex-col sm:flex-row justify-between items-start mb-3 gap-2">
                                                 <div className="flex items-center gap-2 text-sm font-bold text-slate-800 flex-wrap">
-                                                    {isOcean && <Ship className="w-4 h-4 text-blue-500" />}
-                                                    {isAir && <Plane className="w-4 h-4 text-indigo-500" />}
+                                                    {routeConfigMode === 'OCEAN' ? <Ship className="w-4 h-4 text-blue-500" /> : <Plane className="w-4 h-4 text-indigo-500" />}
                                                     <span className="bg-slate-100 px-2 py-1 rounded text-slate-600 whitespace-nowrap">{route.origin}</span>
                                                     <ArrowRight className="w-4 h-4 text-slate-300" />
                                                     <span className="bg-slate-100 px-2 py-1 rounded text-slate-600 whitespace-nowrap">{route.destination}</span>
@@ -587,26 +573,27 @@ export const AdminSettings: React.FC = () => {
                                                 </div>
                                             </div>
                                             
-                                            <div className="grid grid-cols-2 gap-4 text-sm">
-                                                {isOcean ? (
+                                            {/* CONDITIONAL METRIC DISPLAY */}
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                                                {routeConfigMode === 'OCEAN' && (
                                                     <div className="bg-blue-50/50 p-2 rounded border border-blue-100">
-                                                        <span className="text-[10px] font-bold text-blue-400 uppercase">Ocean</span>
+                                                        <span className="text-[10px] font-bold text-blue-400 uppercase">Ocean Data</span>
                                                         <div className="flex flex-col sm:flex-row justify-between mt-1 gap-1">
                                                             <span className="text-slate-700">{route.oceanDistance.toLocaleString()} NM</span>
                                                             <span className="font-medium text-slate-900">{route.oceanTime} days</span>
                                                         </div>
                                                     </div>
-                                                ) : <div className="p-2 border border-dashed border-slate-100 rounded text-slate-300 text-xs flex items-center justify-center">N/A</div>}
+                                                )}
                                                 
-                                                {isAir ? (
+                                                {routeConfigMode === 'AIR' && (
                                                     <div className="bg-indigo-50/50 p-2 rounded border border-indigo-100">
-                                                        <span className="text-[10px] font-bold text-indigo-400 uppercase">Air</span>
+                                                        <span className="text-[10px] font-bold text-indigo-400 uppercase">Air Data</span>
                                                         <div className="flex flex-col sm:flex-row justify-between mt-1 gap-1">
                                                             <span className="text-slate-700">{route.airDistance.toLocaleString()} km</span>
                                                             <span className="font-medium text-slate-900">{route.airTime}</span>
                                                         </div>
                                                     </div>
-                                                ) : <div className="p-2 border border-dashed border-slate-100 rounded text-slate-300 text-xs flex items-center justify-center">N/A</div>}
+                                                )}
                                             </div>
                                         </div>
                                     );
