@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Save, Trash2, Database, Edit3, Plus, ArrowRight, Anchor, MapPin, RefreshCw, XCircle, Settings, Layers, Loader2, Ship, Plane, Shield, Key } from 'lucide-react';
+import { Save, Trash2, Database, Edit3, Plus, ArrowRight, Anchor, MapPin, RefreshCw, XCircle, Settings, Layers, Loader2, Ship, Plane, Shield, Key, Lock, Unlock, LogOut } from 'lucide-react';
 import { getCombinedTerminals } from '../services/portData';
 import { calculateQuickMetrics } from '../services/geminiService';
 import { RouteDB, PortDB } from '../services/routeStorage';
@@ -44,6 +44,11 @@ export const AdminSettings: React.FC = () => {
     // --- SYSTEM / API STATE ---
     const [apiKey, setApiKey] = useState('');
     const [showKey, setShowKey] = useState(false);
+    
+    // ADMIN SECURITY STATE
+    const [isSystemUnlocked, setIsSystemUnlocked] = useState(false);
+    const [adminPassword, setAdminPassword] = useState('');
+    const [authError, setAuthError] = useState('');
 
     useEffect(() => {
         refreshData();
@@ -59,6 +64,22 @@ export const AdminSettings: React.FC = () => {
     };
 
     // --- SYSTEM HANDLERS ---
+    const handleAdminLogin = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (adminPassword === '98765432') {
+            setIsSystemUnlocked(true);
+            setAuthError('');
+            setAdminPassword('');
+        } else {
+            setAuthError('Access Denied: Incorrect Password');
+        }
+    };
+
+    const handleLockSystem = () => {
+        setIsSystemUnlocked(false);
+        setAdminPassword('');
+    };
+
     const handleSaveApiKey = (e: React.FormEvent) => {
         e.preventDefault();
         if (apiKey.trim()) {
@@ -343,75 +364,120 @@ export const AdminSettings: React.FC = () => {
 
                 {/* --- SYSTEM / API TAB --- */}
                 {activeTab === 'system' && (
-                     <div className="p-4 md:p-6 space-y-6 flex-1 overflow-y-auto">
-                         <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl">
-                             <h3 className="text-sm font-bold text-indigo-800 flex items-center gap-2 mb-2">
-                                 <Key className="w-4 h-4" /> Gemini API Configuration
-                             </h3>
-                             <p className="text-xs text-indigo-600 leading-relaxed">
-                                 A valid API Key is required to access real-time shipping data. You may override the default system key below.
-                             </p>
-                         </div>
+                     <div className="flex-1 overflow-y-auto relative h-full">
+                        {!isSystemUnlocked ? (
+                            // LOCKED STATE
+                            <div className="flex flex-col items-center justify-center h-full p-6 text-center space-y-6">
+                                <div className="p-4 bg-slate-100 rounded-full mb-2">
+                                    <Lock className="w-8 h-8 text-slate-400" />
+                                </div>
+                                <div>
+                                    <h3 className="text-slate-800 font-bold text-lg">Admin Access Locked</h3>
+                                    <p className="text-slate-500 text-sm mt-1">Please enter the administrator password to view API settings.</p>
+                                </div>
+                                <form onSubmit={handleAdminLogin} className="w-full max-w-xs space-y-3">
+                                    <input 
+                                        type="password"
+                                        value={adminPassword}
+                                        onChange={(e) => setAdminPassword(e.target.value)}
+                                        className="w-full px-4 py-3 border border-slate-200 rounded-lg text-center font-mono text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                                        placeholder="••••••••"
+                                        autoFocus
+                                    />
+                                    {authError && <p className="text-xs text-red-500 font-bold">{authError}</p>}
+                                    <button 
+                                        type="submit"
+                                        className="w-full bg-slate-800 hover:bg-slate-900 text-white py-3 rounded-lg text-sm font-bold transition-transform active:scale-95 flex items-center justify-center gap-2"
+                                    >
+                                        <Unlock className="w-4 h-4" /> Unlock Settings
+                                    </button>
+                                </form>
+                            </div>
+                        ) : (
+                            // UNLOCKED STATE (Original Content)
+                            <div className="p-4 md:p-6 space-y-6">
+                                <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-lg flex items-center justify-between">
+                                    <div className="flex items-center gap-2 text-emerald-700 text-xs font-bold">
+                                        <Unlock className="w-3 h-3" /> System Unlocked
+                                    </div>
+                                    <button 
+                                        onClick={handleLockSystem}
+                                        className="text-[10px] font-bold text-slate-500 hover:text-slate-800 flex items-center gap-1 bg-white px-2 py-1 rounded border border-slate-200 shadow-sm"
+                                    >
+                                        <Lock className="w-3 h-3" /> Lock
+                                    </button>
+                                </div>
 
-                         <form onSubmit={handleSaveApiKey} className="space-y-4">
-                             <div>
-                                 <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Custom Gemini API Key</label>
-                                 <div className="relative">
-                                     <input 
-                                         type={showKey ? "text" : "password"}
-                                         value={apiKey}
-                                         onChange={(e) => setApiKey(e.target.value)}
-                                         className="w-full pl-10 pr-10 py-3 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
-                                         placeholder="Enter custom key to override system default..."
-                                     />
-                                     <Shield className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
-                                     <button 
-                                        type="button"
-                                        onClick={() => setShowKey(!showKey)}
-                                        className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 text-xs font-bold"
-                                     >
-                                         {showKey ? 'HIDE' : 'SHOW'}
-                                     </button>
-                                 </div>
-                                 <p className="text-[10px] text-slate-400 mt-2">
-                                     Key is stored locally in your browser (LocalStorage). It is never sent to our servers.
-                                 </p>
-                             </div>
+                                <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl">
+                                    <h3 className="text-sm font-bold text-indigo-800 flex items-center gap-2 mb-2">
+                                        <Key className="w-4 h-4" /> Gemini API Configuration
+                                    </h3>
+                                    <p className="text-xs text-indigo-600 leading-relaxed">
+                                        A valid API Key is required to access real-time shipping data. You may override the default system key below.
+                                    </p>
+                                </div>
 
-                             <div className="flex gap-3 pt-4">
-                                 <button 
-                                    type="submit"
-                                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg text-sm font-bold shadow-sm transition-transform active:scale-[0.98]"
-                                 >
-                                     Save & Connect
-                                 </button>
-                                 {apiKey && (
-                                     <button 
-                                        type="button"
-                                        onClick={handleClearApiKey}
-                                        className="px-4 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-sm font-bold transition-colors"
-                                     >
-                                         Remove
-                                     </button>
-                                 )}
-                             </div>
-                         </form>
-                         
-                         <div className="border-t border-slate-100 pt-6 mt-6">
-                             <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">System Status</h4>
-                             <div className="space-y-2">
-                                 <div className="flex justify-between items-center text-sm">
-                                     <span className="text-slate-600">API Connection</span>
-                                     <span className={`px-2 py-0.5 rounded text-xs font-bold ${apiKey ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
-                                         {apiKey ? 'Custom Key Active' : 'Default System Key'}
-                                     </span>
-                                 </div>
-                                 <div className="flex justify-between items-center text-sm">
-                                     <span className="text-slate-600">Model Version</span>
-                                     <span className="font-mono text-xs bg-slate-100 px-2 py-0.5 rounded">gemini-2.5-flash</span>
-                                 </div>
-                             </div>
-                         </div>
+                                <form onSubmit={handleSaveApiKey} className="space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Custom Gemini API Key</label>
+                                        <div className="relative">
+                                            <input 
+                                                type={showKey ? "text" : "password"}
+                                                value={apiKey}
+                                                onChange={(e) => setApiKey(e.target.value)}
+                                                className="w-full pl-10 pr-10 py-3 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
+                                                placeholder="Enter custom key to override system default..."
+                                            />
+                                            <Shield className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
+                                            <button 
+                                                type="button"
+                                                onClick={() => setShowKey(!showKey)}
+                                                className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                                            >
+                                                {showKey ? 'HIDE' : 'SHOW'}
+                                            </button>
+                                        </div>
+                                        <p className="text-[10px] text-slate-400 mt-2">
+                                            Key is stored locally in your browser (LocalStorage). It is never sent to our servers.
+                                        </p>
+                                    </div>
+
+                                    <div className="flex gap-3 pt-4">
+                                        <button 
+                                            type="submit"
+                                            className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg text-sm font-bold shadow-sm transition-transform active:scale-[0.98]"
+                                        >
+                                            Save & Connect
+                                        </button>
+                                        {apiKey && (
+                                            <button 
+                                                type="button"
+                                                onClick={handleClearApiKey}
+                                                className="px-4 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-sm font-bold transition-colors"
+                                            >
+                                                Remove
+                                            </button>
+                                        )}
+                                    </div>
+                                </form>
+                                
+                                <div className="border-t border-slate-100 pt-6 mt-6">
+                                    <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">System Status</h4>
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-slate-600">API Connection</span>
+                                            <span className={`px-2 py-0.5 rounded text-xs font-bold ${apiKey ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                {apiKey ? 'Custom Key Active' : 'Default System Key'}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-slate-600">Model Version</span>
+                                            <span className="font-mono text-xs bg-slate-100 px-2 py-0.5 rounded">gemini-2.5-flash</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                      </div>
                 )}
 
