@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Bell, Anchor, Database, Menu, X, Navigation, Search, Check, Trash2, MapPin, LayoutDashboard, Radio } from 'lucide-react';
+import { Settings, Bell, Anchor, Database, Menu, X, Navigation, Search, Check, Trash2, MapPin, LayoutDashboard, Radio, Activity, TrendingUp, AlertCircle, Ship, Plane, ArrowRight } from 'lucide-react';
 import { PortIntelligence } from './components/PortIntelligence';
 import { AdminSettings } from './components/AdminSettings';
 import { LiveMarketFeed } from './components/LiveMarketFeed';
@@ -262,42 +262,114 @@ const App: React.FC = () => {
                          <LiveMarketFeed />
                     </div>
 
-                    {/* Right: Quick Actions / Overview (Takes 2/3) - Placeholder visuals to make dashboard feel complete */}
-                    <div className="lg:col-span-2 flex flex-col gap-6">
-                        <div className="bg-gradient-to-r from-indigo-600 to-blue-600 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
-                            <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -translate-y-1/2 translate-x-1/4"></div>
-                            <div className="relative z-10">
-                                <h2 className="text-3xl font-bold mb-2">Welcome to Corsair Freightflow</h2>
-                                <p className="text-indigo-100 max-w-lg mb-6">Real-time supply chain monitoring active. Global network status is currently stable.</p>
-                                <div className="flex gap-3">
-                                    <button onClick={() => handleTabChange('ports')} className="bg-white text-indigo-600 px-5 py-2.5 rounded-lg font-bold text-sm hover:bg-indigo-50 transition-colors">
-                                        Search Ports
-                                    </button>
-                                    <button onClick={() => handleTabChange('calculator')} className="bg-indigo-700/50 border border-white/20 text-white px-5 py-2.5 rounded-lg font-bold text-sm hover:bg-indigo-700 transition-colors">
-                                        Check Routes
-                                    </button>
+                    {/* Right: Quick Actions / Overview (Takes 2/3) */}
+                    <div className="lg:col-span-2 flex flex-col gap-6 h-full">
+                        
+                        {/* 1. Global Status Hero Card */}
+                        <div className="bg-slate-900 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden flex flex-col justify-between min-h-[220px]">
+                            {/* Decorative Background Pattern (Dot Matrix World) */}
+                            <div className="absolute inset-0 opacity-10" style={{
+                                backgroundImage: 'radial-gradient(circle, #94a3b8 1px, transparent 1px)',
+                                backgroundSize: '24px 24px'
+                            }}></div>
+                            <div className="absolute right-0 bottom-0 opacity-10">
+                                <Activity className="w-64 h-64 -mb-16 -mr-16 text-indigo-500" />
+                            </div>
+
+                            <div className="relative z-10 flex justify-between items-start">
+                                <div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                                        <span className="text-emerald-400 text-xs font-bold uppercase tracking-widest">System Online</span>
+                                    </div>
+                                    <h2 className="text-3xl font-bold mb-1">Corsair console</h2>
+                                    <p className="text-slate-400 text-sm">Real-time supply chain monitoring</p>
+                                </div>
+                                <div className="text-right hidden sm:block">
+                                    <div className="text-2xl font-mono font-bold">{new Date().toLocaleDateString()}</div>
+                                    <div className="text-xs text-slate-500 uppercase font-bold">Today</div>
+                                </div>
+                            </div>
+
+                            {/* KPI Row inside Hero */}
+                            <div className="relative z-10 grid grid-cols-3 gap-4 mt-8 pt-6 border-t border-slate-800/50">
+                                <div>
+                                    <div className="text-slate-400 text-[10px] uppercase font-bold mb-1">Global Coverage</div>
+                                    <div className="text-xl font-bold">142 <span className="text-xs font-normal text-slate-500">Ports</span></div>
+                                </div>
+                                <div>
+                                    <div className="text-slate-400 text-[10px] uppercase font-bold mb-1">Avg. Latency</div>
+                                    <div className="text-xl font-bold text-indigo-400">120<span className="text-xs font-normal text-slate-500">ms</span></div>
+                                </div>
+                                <div>
+                                    <div className="text-slate-400 text-[10px] uppercase font-bold mb-1">Active Routes</div>
+                                    <div className="text-xl font-bold text-emerald-400">24/7</div>
                                 </div>
                             </div>
                         </div>
 
+                        {/* 2. Key Actions Grid - Enhanced Visuals */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1">
-                             {/* Placeholder Card 1 */}
-                             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center justify-center text-center group hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleTabChange('ports')}>
-                                <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                                    <Anchor className="w-8 h-8 text-blue-500" />
+                             {/* Port Intelligence Card */}
+                             <button 
+                                onClick={() => handleTabChange('ports')}
+                                className="relative bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between group hover:shadow-lg hover:border-indigo-300 transition-all text-left overflow-hidden h-full"
+                             >
+                                <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                                    <Anchor className="w-32 h-32 transform rotate-12 translate-x-8 -translate-y-8" />
                                 </div>
-                                <h3 className="font-bold text-slate-800 text-lg">Port Intelligence</h3>
-                                <p className="text-slate-500 text-sm mt-2">Access infrastructure data for 100+ global terminals.</p>
-                             </div>
+                                
+                                <div className="relative z-10">
+                                    <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center mb-4 group-hover:bg-blue-600 transition-colors">
+                                        <Anchor className="w-6 h-6 text-blue-600 group-hover:text-white transition-colors" />
+                                    </div>
+                                    <h3 className="font-bold text-slate-800 text-lg group-hover:text-blue-600 transition-colors">Port Intelligence</h3>
+                                    <p className="text-slate-500 text-sm mt-2 leading-relaxed">
+                                        Access infrastructure data for 100+ global terminals. Check congestion & capacity.
+                                    </p>
+                                </div>
 
-                             {/* Placeholder Card 2 */}
-                             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center justify-center text-center group hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleTabChange('calculator')}>
-                                <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                                    <Navigation className="w-8 h-8 text-indigo-500" />
+                                <div className="relative z-10 mt-6 pt-4 border-t border-slate-50">
+                                    <div className="flex gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-2">Popular</div>
+                                    <div className="flex gap-2 flex-wrap">
+                                        <span className="px-2 py-1 bg-slate-100 rounded text-xs text-slate-600 font-medium">Shanghai</span>
+                                        <span className="px-2 py-1 bg-slate-100 rounded text-xs text-slate-600 font-medium">Rotterdam</span>
+                                        <span className="px-2 py-1 bg-slate-100 rounded text-xs text-slate-600 font-medium">LAX</span>
+                                    </div>
                                 </div>
-                                <h3 className="font-bold text-slate-800 text-lg">Route Optimizer</h3>
-                                <p className="text-slate-500 text-sm mt-2">AI-powered distance and transit time calculator.</p>
-                             </div>
+                             </button>
+
+                             {/* Route Optimizer Card */}
+                             <button 
+                                onClick={() => handleTabChange('calculator')}
+                                className="relative bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between group hover:shadow-lg hover:border-indigo-300 transition-all text-left overflow-hidden h-full"
+                             >
+                                <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                                    <Navigation className="w-32 h-32 transform -rotate-12 translate-x-8 -translate-y-8" />
+                                </div>
+                                
+                                <div className="relative z-10">
+                                    <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center mb-4 group-hover:bg-indigo-600 transition-colors">
+                                        <Navigation className="w-6 h-6 text-indigo-600 group-hover:text-white transition-colors" />
+                                    </div>
+                                    <h3 className="font-bold text-slate-800 text-lg group-hover:text-indigo-600 transition-colors">Route Optimizer</h3>
+                                    <p className="text-slate-500 text-sm mt-2 leading-relaxed">
+                                        AI-powered calculator for distance, transit time, and multi-modal path planning.
+                                    </p>
+                                </div>
+
+                                <div className="relative z-10 mt-6 pt-4 border-t border-slate-50">
+                                     <div className="flex items-center gap-3 w-full opacity-60 group-hover:opacity-100 transition-opacity">
+                                         <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
+                                         <div className="h-0.5 flex-1 bg-gradient-to-r from-indigo-500 to-blue-500 relative">
+                                             <div className="absolute top-1/2 left-1/2 -translate-y-1/2 -translate-x-1/2 bg-white p-0.5 rounded-full border border-indigo-200">
+                                                 <Plane className="w-3 h-3 text-indigo-500" />
+                                             </div>
+                                         </div>
+                                         <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                     </div>
+                                </div>
+                             </button>
                         </div>
                     </div>
                 </div>
