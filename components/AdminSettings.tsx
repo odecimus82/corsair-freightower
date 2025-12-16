@@ -270,6 +270,51 @@ export const AdminSettings: React.FC = () => {
     // --- LIST FILTERING LOGIC (Ports) ---
     const filteredSavedPorts = savedPorts.filter(p => p.type === portConfigMode);
 
+    // Render helper for Port List to avoid deep nesting issues
+    const PortListComponent = () => {
+        if (filteredSavedPorts.length === 0) {
+            return (
+                <div className="h-full flex flex-col items-center justify-center text-slate-400 text-center py-8">
+                    <Anchor className="w-12 h-12 mb-3 text-slate-200" />
+                    <p>No custom {portConfigMode === 'OCEAN' ? 'Ocean' : 'Air'} ports saved.</p>
+                    <p className="text-xs mt-2 text-slate-400">Switch mode or add a new port to see it here.</p>
+                </div>
+            );
+        }
+
+        return (
+            <div className="grid gap-3">
+                {filteredSavedPorts.map((port) => (
+                    <div key={port.value} className={`bg-white p-4 rounded-lg border shadow-sm flex justify-between items-center group ${editingPortValue === port.value ? 'border-amber-400 ring-1 ring-amber-400' : 'border-slate-200'}`}>
+                        <div className="flex items-center gap-3">
+                            <div className={`p-2 rounded-full ${port.type === 'OCEAN' ? 'bg-blue-100 text-blue-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                                {port.type === 'OCEAN' ? <Anchor className="w-4 h-4" /> : <MapPin className="w-4 h-4" />}
+                            </div>
+                            <div className="min-w-0">
+                                <h4 className="font-bold text-slate-800 text-sm truncate">{port.label.split(' - ')[0]}</h4>
+                                <p className="text-xs text-slate-500 truncate">{port.value}</p>
+                            </div>
+                        </div>
+                        <div className="flex gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                            <button 
+                                onClick={() => {
+                                    setPortMode('edit');
+                                    handleSelectPortToEdit(port.value);
+                                }} 
+                                className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded"
+                            >
+                                <Edit3 className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => handleDeletePort(port.value)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded">
+                                <Trash2 className="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        );
+    };
+
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-full">
             {/* Left Panel: Edit Forms */}
@@ -743,44 +788,7 @@ export const AdminSettings: React.FC = () => {
                     )}
 
                     {activeTab === 'ports' && (
-                        /* PORTS LIST */
-                         filteredSavedPorts.length === 0 ? (
-                            <div className="h-full flex flex-col items-center justify-center text-slate-400 text-center py-8">
-                                <Anchor className="w-12 h-12 mb-3 text-slate-200" />
-                                <p>No custom {portConfigMode === 'OCEAN' ? 'Ocean' : 'Air'} ports saved.</p>
-                                <p className="text-xs mt-2 text-slate-400">Switch mode or add a new port to see it here.</p>
-                            </div>
-                        ) : (
-                            <div className="grid gap-3">
-                                {filteredSavedPorts.map((port) => (
-                                    <div key={port.value} className={`bg-white p-4 rounded-lg border shadow-sm flex justify-between items-center group ${editingPortValue === port.value ? 'border-amber-400 ring-1 ring-amber-400' : 'border-slate-200'}`}>
-                                        <div className="flex items-center gap-3">
-                                            <div className={`p-2 rounded-full ${port.type === 'OCEAN' ? 'bg-blue-100 text-blue-600' : 'bg-indigo-100 text-indigo-600'}`}>
-                                                {port.type === 'OCEAN' ? <Anchor className="w-4 h-4" /> : <MapPin className="w-4 h-4" />}
-                                            </div>
-                                            <div className="min-w-0">
-                                                <h4 className="font-bold text-slate-800 text-sm truncate">{port.label.split(' - ')[0]}</h4>
-                                                <p className="text-xs text-slate-500 truncate">{port.value}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                                            <button 
-                                                onClick={() => {
-                                                    setPortMode('edit');
-                                                    handleSelectPortToEdit(port.value);
-                                                }} 
-                                                className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded"
-                                            >
-                                                <Edit3 className="w-4 h-4" />
-                                            </button>
-                                            <button onClick={() => handleDeletePort(port.value)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded">
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )
+                        <PortListComponent />
                     )}
                 </div>
             </div>
