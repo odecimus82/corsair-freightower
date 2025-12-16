@@ -4,46 +4,96 @@ import { fetchLogisticsNews } from '../services/geminiService';
 import { LogisticsNewsItem } from '../types';
 import { Radio, Plane, Ship, AlertTriangle, CloudRain, Clock, RefreshCw, Globe, MapPin } from 'lucide-react';
 
+const CACHE_KEY = 'freightflow_news_cache';
+
+// Instant Fallback Data (Used if no cache & API is loading)
+const FALLBACK_NEWS: LogisticsNewsItem[] = [
+    { id: 'fb1', timestamp: '09:15 CST', category: 'PORT', location: 'Shanghai (CNSHA)', headline: 'Terminal 4 operating at peak efficiency', impact: 'LOW' },
+    { id: 'fb2', timestamp: '18:30 PST', category: 'AIRPORT', location: 'Los Angeles (KLAX)', headline: 'Cargo apron congestion easing, 2h delays', impact: 'MEDIUM' },
+    { id: 'fb3', timestamp: '03:45 CET', category: 'PORT', location: 'Rotterdam (NLRTM)', headline: 'Vessel queue stable, gate operations normal', impact: 'LOW' },
+    { id: 'fb4', timestamp: '21:00 EST', category: 'WEATHER', location: 'North Atlantic', headline: 'Storm front causing minor deviation for westbound vessels', impact: 'MEDIUM' },
+    { id: 'fb5', timestamp: '11:20 HKT', category: 'AIRPORT', location: 'Hong Kong (VHHH)', headline: 'Exports volume surge, booking recommended 3 days prior', impact: 'MEDIUM' },
+    { id: 'fb6', timestamp: '14:10 GST', category: 'PORT', location: 'Jebel Ali (AEJEA)', headline: 'Customs system maintenance scheduled for weekend', impact: 'LOW' }
+];
+
 export const LiveMarketFeed: React.FC = () => {
     const [news, setNews] = useState<LogisticsNewsItem[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [isRefreshing, setIsRefreshing] = useState(false); // Used for small spinner
     const [nextUpdateIn, setNextUpdateIn] = useState<number>(10); // Minutes
     const [currentTime, setCurrentTime] = useState(new Date());
 
-    const scrollContainerRef = useRef<HTMLDivElement>(null);
-
-    const loadNews = async () => {
-        setLoading(true);
+    const loadNews = async (isBackground = false) => {
+        if (!isBackground) setIsRefreshing(true);
+        
         try {
             const data = await fetchLogisticsNews();
-            // Duplicate the data to ensure smooth infinite scrolling illusion if list is short
-            setNews([...data, ...data]); 
-            setNextUpdateIn(10);
+            
+            if (data && data.length > 0) {
+                // Duplicate the data to ensure smooth infinite scrolling illusion
+                const displayData = [...data, ...data]; 
+                setNews(displayData);
+                
+                // Cache the RAW single set of data
+                localStorage.setItem(CACHE_KEY, JSON.stringify({
+                    timestamp: Date.now(),
+                    data: data
+                }));
+                
+                setNextUpdateIn(10);
+            }
         } catch (error) {
-            console.error(error);
+            console.error("Failed to load fresh news:", error);
+            // If API fails, we just keep showing whatever we have (cache or fallback)
         } finally {
-            setLoading(false);
+            setIsRefreshing(false);
         }
     };
 
     useEffect(() => {
-        loadNews();
+        // --- 1. INSTANT LOAD STRATEGY ---
+        const loadInitialData = () => {
+            const cached = localStorage.getItem(CACHE_KEY);
+            let hasValidCache = false;
 
-        // 1. Data Refresh Interval (10 mins)
+            if (cached) {
+                try {
+                    const parsed = JSON.parse(cached);
+                    // Check if cache is "fresh enough" (e.g., less than 1 hour old)
+                    // Even if old, we show it first, then update in background
+                    if (parsed.data && Array.isArray(parsed.data)) {
+                        const cachedData = parsed.data;
+                        setNews([...cachedData, ...cachedData]); // Duplicate for scroll
+                        hasValidCache = true;
+                    }
+                } catch (e) {
+                    console.warn("Cache parse failed, using fallback");
+                }
+            }
+
+            if (!hasValidCache) {
+                // If no cache, show Fallback immediately so user sees something
+                setNews([...FALLBACK_NEWS, ...FALLBACK_NEWS]);
+            }
+
+            // Always fetch fresh data in background to update the view
+            // Delay slightly to let the UI render the initial frame smoothly
+            setTimeout(() => loadNews(true), 1000); 
+        };
+
+        loadInitialData();
+
+        // --- 2. INTERVALS ---
+        
+        // Data Refresh Interval (10 mins)
         const dataInterval = setInterval(() => {
-            loadNews();
+            loadNews(true); // Always background refresh on interval
         }, 600000); 
 
-        // 2. Countdown Timer & Clock (Every minute/second)
+        // Clock & Countdown
         const timerInterval = setInterval(() => {
             setCurrentTime(new Date());
-            setNextUpdateIn(prev => {
-                // Approximate logic just to show movement
-                return prev; 
-            });
         }, 1000);
 
-        // Update countdown separately to avoid jitter
         const countdownInterval = setInterval(() => {
              setNextUpdateIn(prev => prev > 0 ? prev - 1 : 10);
         }, 60000);
@@ -92,8 +142,8 @@ export const LiveMarketFeed: React.FC = () => {
                     <div className="flex justify-between items-center mb-6">
                         <div className="flex items-center gap-3">
                             <div className="relative">
-                                <div className="w-3 h-3 bg-red-500 rounded-full animate-ping absolute top-0 left-0 opacity-75"></div>
-                                <div className="w-3 h-3 bg-red-500 rounded-full relative"></div>
+                                <div className={`w-3 h-3 rounded-full absolute top-0 left-0 opacity-75 ${isRefreshing ? 'bg-amber-500 animate-ping' : 'bg-red-500 animate-ping'}`}></div>
+                                <div className={`w-3 h-3 rounded-full relative ${isRefreshing ? 'bg-amber-500' : 'bg-red-500'}`}></div>
                             </div>
                             <div>
                                 <h2 className="text-white font-bold text-xl tracking-tight leading-none">Global Ops Center</h2>
@@ -101,12 +151,12 @@ export const LiveMarketFeed: React.FC = () => {
                             </div>
                         </div>
                         <div className="flex items-center gap-2 text-slate-400 text-xs bg-slate-800/50 px-3 py-1.5 rounded-full border border-slate-700">
-                            <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
-                            <span>Next: {nextUpdateIn}m</span>
+                            <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin text-amber-400' : 'text-slate-500'}`} />
+                            <span>{isRefreshing ? 'Updating...' : `Next: ${nextUpdateIn}m`}</span>
                         </div>
                     </div>
 
-                    {/* World Clocks - Key Feature for Cross-Region Users */}
+                    {/* World Clocks */}
                     <div className="grid grid-cols-3 gap-2 border-t border-slate-800 pt-4">
                         <div className="text-center border-r border-slate-800 last:border-0">
                             <div className="text-slate-500 text-[10px] font-bold uppercase mb-1 flex items-center justify-center gap-1">
@@ -151,7 +201,8 @@ export const LiveMarketFeed: React.FC = () => {
                     <div className="absolute top-0 left-0 w-full h-8 bg-gradient-to-b from-white to-transparent z-10 pointer-events-none"></div>
                     <div className="absolute bottom-0 left-0 w-full h-8 bg-gradient-to-t from-white to-transparent z-10 pointer-events-none"></div>
 
-                    {loading && news.length === 0 ? (
+                    {news.length === 0 ? (
+                         // Should not happen with fallback, but safe guard
                         <div className="h-full flex flex-col items-center justify-center text-slate-400 gap-3">
                             <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
                             <span className="text-xs">Establishing Satellite Link...</span>
