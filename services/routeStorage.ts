@@ -6,7 +6,6 @@ const PORT_STORAGE_KEY = 'freightflow_port_db';
 const NOTIFICATION_STORAGE_KEY = 'freightflow_notifications';
 
 // Helper to safely parse JSON from localStorage
-// Updated to handle SecurityErrors (if storage is disabled) without crashing
 const safeParse = <T>(key: string, fallback: T): T => {
     try {
         if (typeof window === 'undefined' || !window.localStorage) return fallback;
@@ -15,7 +14,6 @@ const safeParse = <T>(key: string, fallback: T): T => {
     } catch (e) {
         console.warn(`Storage access failed for ${key}`, e);
         try {
-            // Attempt to clear if possible, but ignore if this also fails (e.g. SecurityError)
             if (typeof window !== 'undefined' && window.localStorage) {
                 window.localStorage.removeItem(key);
             }
@@ -71,19 +69,43 @@ export const RouteDB = {
 
     get: (origin: string, destination: string): RouteOverride | undefined => {
         const routes = RouteDB.getAll();
-        // Create a unique key for the route
-        const id = `${origin}-${destination}`;
-        return routes.find(r => r.id === id);
+        
+        // Normalize inputs
+        const o = origin.trim().toLowerCase();
+        const d = destination.trim().toLowerCase();
+        const id = `${origin}-${destination}`; // strict ID check
+
+        // 1. Try exact ID match first
+        let match = routes.find(r => r.id === id);
+        
+        // 2. If not found, try loose matching on origin/dest fields
+        if (!match) {
+            match = routes.find(r => 
+                r.origin.trim().toLowerCase() === o && 
+                r.destination.trim().toLowerCase() === d
+            );
+        }
+
+        return match;
     },
 
     save: (route: RouteOverride) => {
         try {
             const routes = RouteDB.getAll();
-            const existingIndex = routes.findIndex(r => r.id === route.id);
+            // We use the same loose matching logic to find existing entries to update
+            const o = route.origin.trim().toLowerCase();
+            const d = route.destination.trim().toLowerCase();
+            
+            const existingIndex = routes.findIndex(r => 
+                r.id === route.id || 
+                (r.origin.trim().toLowerCase() === o && r.destination.trim().toLowerCase() === d)
+            );
             
             let isUpdate = false;
             if (existingIndex >= 0) {
-                routes[existingIndex] = route;
+                // Keep the ID consistent if updating by field match
+                const existingID = routes[existingIndex].id;
+                routes[existingIndex] = { ...route, id: existingID }; 
                 isUpdate = true;
             } else {
                 routes.push(route);

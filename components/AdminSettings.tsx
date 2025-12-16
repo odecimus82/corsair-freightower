@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Save, Trash2, Database, Edit3, Plus, ArrowRight, Anchor, MapPin, RefreshCw, XCircle, Settings, Layers, Loader2 } from 'lucide-react';
+import { Save, Trash2, Database, Edit3, Plus, ArrowRight, Anchor, MapPin, RefreshCw, XCircle, Settings, Layers, Loader2, Ship, Plane } from 'lucide-react';
 import { getCombinedTerminals } from '../services/portData';
 import { calculateQuickMetrics } from '../services/geminiService';
 import { RouteDB, PortDB } from '../services/routeStorage';
@@ -12,19 +12,27 @@ export const AdminSettings: React.FC = () => {
     // --- ROUTE STATE ---
     const [savedRoutes, setSavedRoutes] = useState<RouteOverride[]>([]);
     const [terminals, setTerminals] = useState<TerminalOption[]>([]);
+    
+    // Mode Separation State
+    const [routeConfigMode, setRouteConfigMode] = useState<'OCEAN' | 'AIR'>('OCEAN');
+
     const [origin, setOrigin] = useState('');
     const [destination, setDestination] = useState('');
+    
+    // Ocean Data State
     const [oceanDist, setOceanDist] = useState(0);
     const [oceanTime, setOceanTime] = useState('');
+    
+    // Air Data State
     const [airDist, setAirDist] = useState(0);
     const [airTime, setAirTime] = useState('');
+    
     const [isFetchingRoute, setIsFetchingRoute] = useState(false);
 
     // --- PORT STATE ---
-    const [savedPorts, setSavedPorts] = useState<TerminalOption[]>([]); // Only custom ports (for deletion logic)
-    const [portMode, setPortMode] = useState<'create' | 'edit'>('edit'); // Default to edit to see list
+    const [savedPorts, setSavedPorts] = useState<TerminalOption[]>([]); 
+    const [portMode, setPortMode] = useState<'create' | 'edit'>('edit'); 
     
-    // Form Fields
     const [portName, setPortName] = useState('');
     const [portCode, setPortCode] = useState('');
     const [portCountry, setPortCountry] = useState('');
@@ -38,27 +46,54 @@ export const AdminSettings: React.FC = () => {
     const refreshData = () => {
         setSavedRoutes(RouteDB.getAll());
         setSavedPorts(PortDB.getAll());
-        setTerminals(getCombinedTerminals()); // This loads ALL ports (Global + Custom)
+        setTerminals(getCombinedTerminals()); 
     };
 
     // --- ROUTE HANDLERS ---
     
+    const handleRouteModeChange = (mode: 'OCEAN' | 'AIR') => {
+        setRouteConfigMode(mode);
+        // Reset selection when switching modes to prevent "Shanghai Port -> Heathrow Airport" logic errors
+        setOrigin('');
+        setDestination('');
+        setOceanDist(0);
+        setOceanTime('');
+        setAirDist(0);
+        setAirTime('');
+    };
+
     const fetchRouteEstimates = async (o: string, d: string) => {
         if (!o || !d) return;
+
+        // CRITICAL FIX: Check local DB first! 
+        // If the user selects a route that is already saved, load it immediately.
+        // Do NOT call AI to overwrite what the user manually saved.
+        const existingRoute = RouteDB.get(o, d);
+        if (existingRoute) {
+             if (routeConfigMode === 'OCEAN') {
+                 setOceanDist(existingRoute.oceanDistance);
+                 setOceanTime(existingRoute.oceanTime);
+             } else {
+                 setAirDist(existingRoute.airDistance);
+                 setAirTime(existingRoute.airTime);
+             }
+             return; // Stop here, do not fetch from AI
+        }
+
         setIsFetchingRoute(true);
-        // Visual reset while loading
-        setOceanDist(0);
-        setAirDist(0);
-        setOceanTime('');
-        setAirTime('');
+        // Reset current fields slightly to show loading effect
+        if (routeConfigMode === 'OCEAN') { setOceanDist(0); setOceanTime(''); }
+        if (routeConfigMode === 'AIR') { setAirDist(0); setAirTime(''); }
         
         try {
-            // Using the new optimized function for faster results
             const data = await calculateQuickMetrics(o, d);
-            setOceanDist(data.oceanDistance);
-            setOceanTime(data.oceanTime);
-            setAirDist(data.airDistance);
-            setAirTime(data.airTime);
+            if (routeConfigMode === 'OCEAN') {
+                setOceanDist(data.oceanDistance);
+                setOceanTime(data.oceanTime);
+            } else {
+                setAirDist(data.airDistance);
+                setAirTime(data.airTime);
+            }
         } catch (e) {
             console.error("Failed to fetch estimates", e);
         } finally {
@@ -80,14 +115,21 @@ export const AdminSettings: React.FC = () => {
         e.preventDefault();
         if (!origin || !destination) return;
 
+        // When saving, we only populate the fields relevant to the current mode.
+        // The other fields are set to 0/empty to indicate they are not valid for this specific origin-dest pair.
+        // HOWEVER, if we are updating an existing record, we should try to preserve the OTHER mode's data if it exists?
+        // Current logic: strict separation. If I save Ocean, I don't care about Air for this specific O-D pair 
+        // because we prevent mixing types now. So overwriting with 0 for the other mode is actually correct 
+        // to keep the DB clean for the "Mode Separation" logic.
+        
         const newRoute: RouteOverride = {
             id: `${origin}-${destination}`,
             origin,
             destination,
-            oceanDistance: oceanDist,
-            oceanTime: oceanTime,
-            airDistance: airDist,
-            airTime: airTime
+            oceanDistance: routeConfigMode === 'OCEAN' ? oceanDist : 0,
+            oceanTime: routeConfigMode === 'OCEAN' ? oceanTime : '',
+            airDistance: routeConfigMode === 'AIR' ? airDist : 0,
+            airTime: routeConfigMode === 'AIR' ? airTime : ''
         };
 
         RouteDB.save(newRoute);
@@ -103,6 +145,13 @@ export const AdminSettings: React.FC = () => {
     };
 
     const handleEditRoute = (route: RouteOverride) => {
+        // Determine mode based on which data is populated
+        // This is a heuristic: if airDistance > 0 it's likely air, otherwise ocean
+        // Or check the terminal type of the origin
+        const originTerminal = terminals.find(t => t.value === route.origin);
+        const mode = originTerminal ? originTerminal.type : (route.airDistance > 0 ? 'AIR' : 'OCEAN');
+
+        setRouteConfigMode(mode);
         setOrigin(route.origin);
         setDestination(route.destination);
         setOceanDist(route.oceanDistance);
@@ -122,7 +171,7 @@ export const AdminSettings: React.FC = () => {
     };
 
     // --- PORT HANDLERS ---
-
+    // (Existing Port Handlers remain unchanged)
     const handleModeSwitch = (mode: 'create' | 'edit') => {
         setPortMode(mode);
         resetPortForm();
@@ -134,7 +183,6 @@ export const AdminSettings: React.FC = () => {
 
         const formattedValue = `${portName}, ${portCountry}`;
         
-        // 1. Construct the Port Object
         const newPort: TerminalOption = {
             label: `${portName} (${portCode || 'Custom'}) - ${portCountry}`,
             value: formattedValue,
@@ -143,15 +191,11 @@ export const AdminSettings: React.FC = () => {
             code: portCode
         };
 
-        // 2. Logic for Update vs Create
         if (portMode === 'edit' && editingPortValue) {
-            // If the ID (Name+Country) changed, we must delete the old record to avoid duplicates
             if (editingPortValue !== formattedValue) {
-                // Only try delete if it was a custom port. Global ports won't be in DB, so delete does nothing safe.
                 PortDB.delete(editingPortValue);
             }
         } else {
-             // Create Mode Check: Prevent duplicates
             if (terminals.some(p => p.value === formattedValue && p.value !== editingPortValue)) {
                 if (!window.confirm("A port with this name already exists. Overwrite?")) {
                     return;
@@ -159,13 +203,9 @@ export const AdminSettings: React.FC = () => {
             }
         }
 
-        // 3. Save (Updates LocalStorage)
         PortDB.save(newPort);
-        
         refreshData();
         resetPortForm();
-        // Optional: Stay in edit mode or switch? Let's clear and stay in current mode
-        alert(portMode === 'create' ? "Port Created Successfully" : "Port Updated Successfully");
     };
 
     const handleSelectPortToEdit = (val: string) => {
@@ -173,11 +213,8 @@ export const AdminSettings: React.FC = () => {
             resetPortForm();
             return;
         }
-        
-        // Find in ALL terminals (Global + Custom)
         const target = terminals.find(p => p.value === val);
         if (target) {
-            // Populate Form
             const rawName = target.value.includes(',') ? target.value.split(',')[0] : target.label.split(' (')[0];
             setPortName(rawName);
             setPortCode(target.code || '');
@@ -203,9 +240,6 @@ export const AdminSettings: React.FC = () => {
         setEditingPortValue(null);
     };
 
-    // Helper to identify if a selected port is custom or global
-    const isSelectedCustom = editingPortValue ? savedPorts.some(p => p.value === editingPortValue) : false;
-
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-full">
             {/* Left Panel: Edit Forms */}
@@ -228,114 +262,136 @@ export const AdminSettings: React.FC = () => {
 
                 {activeTab === 'routes' ? (
                     <form onSubmit={handleSaveRoute} className="p-4 md:p-6 space-y-4 md:space-y-5 flex-1 overflow-y-auto">
+                        
+                        {/* MODE TOGGLES */}
+                        <div className="bg-slate-100 p-1 rounded-lg flex gap-1">
+                            <button
+                                type="button"
+                                onClick={() => handleRouteModeChange('OCEAN')}
+                                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-md text-xs font-bold transition-all ${routeConfigMode === 'OCEAN' ? 'bg-white text-blue-600 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                <Ship className="w-4 h-4" /> Ocean Routes
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleRouteModeChange('AIR')}
+                                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-md text-xs font-bold transition-all ${routeConfigMode === 'AIR' ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                <Plane className="w-4 h-4" /> Air Routes
+                            </button>
+                        </div>
+
                         <div className="space-y-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
                             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide flex justify-between items-center">
-                                Route Endpoints
+                                {routeConfigMode === 'OCEAN' ? 'Port-to-Port' : 'Airport-to-Airport'} Selection
                                 {isFetchingRoute && <span className="text-indigo-500 text-[10px] animate-pulse">Auto-calculating...</span>}
                             </h3>
                             <div>
-                                <label className="block text-xs font-medium text-slate-700 mb-1">Origin Port/Hub</label>
+                                <label className="block text-xs font-medium text-slate-700 mb-1">Origin {routeConfigMode === 'OCEAN' ? 'Port' : 'Airport'}</label>
                                 <select 
                                     value={origin} onChange={(e) => handleOriginChange(e.target.value)}
                                     className="w-full p-2 border border-slate-200 rounded text-sm bg-white"
                                     required
                                 >
                                     <option value="">Select Origin...</option>
-                                    {terminals.map(t => (
+                                    {terminals.filter(t => t.type === routeConfigMode).map(t => (
                                         <option key={t.value + t.type} value={t.value}>{t.label}</option>
                                     ))}
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-slate-700 mb-1">Destination Port/Hub</label>
+                                <label className="block text-xs font-medium text-slate-700 mb-1">Destination {routeConfigMode === 'OCEAN' ? 'Port' : 'Airport'}</label>
                                 <select 
                                     value={destination} onChange={(e) => handleDestChange(e.target.value)}
                                     className="w-full p-2 border border-slate-200 rounded text-sm bg-white"
                                     required
                                 >
                                     <option value="">Select Destination...</option>
-                                    {terminals.map(t => (
+                                    {terminals.filter(t => t.type === routeConfigMode).map(t => (
                                         <option key={t.value + t.type} value={t.value}>{t.label}</option>
                                     ))}
                                 </select>
                             </div>
                         </div>
 
-                        <div className="space-y-4">
-                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-blue-500"></span> Ocean Data
-                            </h3>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="block text-xs font-medium text-slate-700 mb-1">Distance (NM)</label>
-                                    <div className="relative">
-                                        <input 
-                                            type="number" 
-                                            value={oceanDist} onChange={e => setOceanDist(Number(e.target.value))}
-                                            disabled={isFetchingRoute}
-                                            className={`w-full p-2 border border-slate-200 rounded text-sm transition-colors ${isFetchingRoute ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
-                                            placeholder="6500"
-                                        />
-                                        {isFetchingRoute && <Loader2 className="absolute right-2 top-2 w-4 h-4 animate-spin text-indigo-500" />}
+                        {/* CONDITIONAL INPUTS BASED ON MODE */}
+                        {routeConfigMode === 'OCEAN' ? (
+                            <div className="space-y-4 animate-in fade-in slide-in-from-right-2">
+                                <h3 className="text-xs font-bold text-blue-500 uppercase tracking-wide flex items-center gap-2">
+                                    <Anchor className="w-3 h-3" /> Ocean Metrics
+                                </h3>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-700 mb-1">Distance (NM)</label>
+                                        <div className="relative">
+                                            <input 
+                                                type="number" 
+                                                value={oceanDist} onChange={e => setOceanDist(Number(e.target.value))}
+                                                disabled={isFetchingRoute}
+                                                className={`w-full p-2 border border-slate-200 rounded text-sm transition-colors ${isFetchingRoute ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
+                                                placeholder="6500"
+                                            />
+                                            {isFetchingRoute && <Loader2 className="absolute right-2 top-2 w-4 h-4 animate-spin text-indigo-500" />}
+                                        </div>
                                     </div>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-slate-700 mb-1">Time (Days)</label>
-                                    <div className="relative">
-                                        <input 
-                                            type="text" 
-                                            value={oceanTime} onChange={e => setOceanTime(e.target.value)}
-                                            disabled={isFetchingRoute}
-                                            className={`w-full p-2 border border-slate-200 rounded text-sm transition-colors ${isFetchingRoute ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
-                                            placeholder="25-28"
-                                        />
-                                        {isFetchingRoute && <Loader2 className="absolute right-2 top-2 w-4 h-4 animate-spin text-indigo-500" />}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="space-y-4 border-t border-slate-100 pt-4">
-                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide flex items-center gap-2">
-                                 <span className="w-2 h-2 rounded-full bg-indigo-500"></span> Air Data
-                            </h3>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="block text-xs font-medium text-slate-700 mb-1">Distance (km)</label>
-                                    <div className="relative">
-                                        <input 
-                                            type="number" 
-                                            value={airDist} onChange={e => setAirDist(Number(e.target.value))}
-                                            disabled={isFetchingRoute}
-                                            className={`w-full p-2 border border-slate-200 rounded text-sm transition-colors ${isFetchingRoute ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
-                                            placeholder="9800"
-                                        />
-                                        {isFetchingRoute && <Loader2 className="absolute right-2 top-2 w-4 h-4 animate-spin text-indigo-500" />}
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-slate-700 mb-1">Time (Hrs)</label>
-                                    <div className="relative">
-                                        <input 
-                                            type="text" 
-                                            value={airTime} onChange={e => setAirTime(e.target.value)}
-                                            disabled={isFetchingRoute}
-                                            className={`w-full p-2 border border-slate-200 rounded text-sm transition-colors ${isFetchingRoute ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
-                                            placeholder="14-16"
-                                        />
-                                        {isFetchingRoute && <Loader2 className="absolute right-2 top-2 w-4 h-4 animate-spin text-indigo-500" />}
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-700 mb-1">Time (Days)</label>
+                                        <div className="relative">
+                                            <input 
+                                                type="text" 
+                                                value={oceanTime} onChange={e => setOceanTime(e.target.value)}
+                                                disabled={isFetchingRoute}
+                                                className={`w-full p-2 border border-slate-200 rounded text-sm transition-colors ${isFetchingRoute ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
+                                                placeholder="25-28"
+                                            />
+                                            {isFetchingRoute && <Loader2 className="absolute right-2 top-2 w-4 h-4 animate-spin text-indigo-500" />}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        ) : (
+                             <div className="space-y-4 animate-in fade-in slide-in-from-right-2">
+                                <h3 className="text-xs font-bold text-indigo-500 uppercase tracking-wide flex items-center gap-2">
+                                     <Plane className="w-3 h-3" /> Air Metrics
+                                </h3>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-700 mb-1">Distance (km)</label>
+                                        <div className="relative">
+                                            <input 
+                                                type="number" 
+                                                value={airDist} onChange={e => setAirDist(Number(e.target.value))}
+                                                disabled={isFetchingRoute}
+                                                className={`w-full p-2 border border-slate-200 rounded text-sm transition-colors ${isFetchingRoute ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
+                                                placeholder="9800"
+                                            />
+                                            {isFetchingRoute && <Loader2 className="absolute right-2 top-2 w-4 h-4 animate-spin text-indigo-500" />}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-700 mb-1">Time (Hrs)</label>
+                                        <div className="relative">
+                                            <input 
+                                                type="text" 
+                                                value={airTime} onChange={e => setAirTime(e.target.value)}
+                                                disabled={isFetchingRoute}
+                                                className={`w-full p-2 border border-slate-200 rounded text-sm transition-colors ${isFetchingRoute ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
+                                                placeholder="14-16"
+                                            />
+                                            {isFetchingRoute && <Loader2 className="absolute right-2 top-2 w-4 h-4 animate-spin text-indigo-500" />}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         <div className="pt-2 mt-auto">
                             <button 
                                 type="submit" 
                                 disabled={isFetchingRoute}
-                                className={`w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-lg text-sm font-bold transition-colors ${isFetchingRoute ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-colors text-white ${routeConfigMode === 'OCEAN' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-indigo-600 hover:bg-indigo-700'} ${isFetchingRoute ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
-                                <Save className="w-4 h-4" /> Save Route
+                                <Save className="w-4 h-4" /> Save {routeConfigMode === 'OCEAN' ? 'Ocean' : 'Air'} Route
                             </button>
                              <button type="button" onClick={resetRouteForm} className="w-full mt-2 text-slate-500 text-xs hover:text-slate-800">
                                 Clear Form
@@ -344,8 +400,7 @@ export const AdminSettings: React.FC = () => {
                     </form>
                 ) : (
                     <form onSubmit={handleSavePort} className="p-4 md:p-6 space-y-4 md:space-y-5 flex-1 overflow-y-auto flex flex-col">
-                        
-                        {/* 1. Mode Switcher Tabs */}
+                         {/* (Port Form Content Same as before) */}
                         <div className="bg-slate-100 p-1 rounded-lg flex gap-1 mb-2">
                             <button
                                 type="button"
@@ -363,7 +418,6 @@ export const AdminSettings: React.FC = () => {
                             </button>
                         </div>
 
-                        {/* 2. Mode Specific Content */}
                         {portMode === 'edit' && (
                             <div className="animate-in slide-in-from-top-2 duration-300">
                                 <label className="block text-xs font-medium text-slate-700 mb-1">Select Port to Modify</label>
@@ -373,8 +427,6 @@ export const AdminSettings: React.FC = () => {
                                     className="w-full p-2 border border-slate-200 rounded text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-shadow text-slate-700"
                                 >
                                     <option value="">-- Search / Select Port --</option>
-                                    
-                                    {/* Group 1: Custom Ports */}
                                     {savedPorts.length > 0 && (
                                         <optgroup label="Custom Ports">
                                             {savedPorts.map(p => (
@@ -382,20 +434,15 @@ export const AdminSettings: React.FC = () => {
                                             ))}
                                         </optgroup>
                                     )}
-
-                                    {/* Group 2: Global Database */}
                                     <optgroup label="Global Database">
                                         {terminals
-                                            .filter(t => !savedPorts.some(sp => sp.value === t.value)) // Hide duplicates if customized
+                                            .filter(t => !savedPorts.some(sp => sp.value === t.value)) 
                                             .map(p => (
                                                 <option key={p.value} value={p.value}>{p.label}</option>
                                             ))
                                         }
                                     </optgroup>
                                 </select>
-                                <p className="text-[10px] text-slate-400 mt-1">
-                                    Select any port (Global or Custom) to load its data into the form below.
-                                </p>
                             </div>
                         )}
                         
@@ -407,7 +454,6 @@ export const AdminSettings: React.FC = () => {
 
                         <div className="border-t border-slate-100 my-1"></div>
 
-                        {/* 3. Common Form Fields */}
                         <div>
                             <label className="block text-xs font-medium text-slate-700 mb-1">Port / Airport Name</label>
                             <input 
@@ -499,7 +545,7 @@ export const AdminSettings: React.FC = () => {
             <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-100 flex flex-col order-2 lg:order-2 h-full max-h-[calc(100vh-140px)]">
                 <div className="p-4 md:p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 flex-shrink-0">
                     <h2 className="text-base md:text-lg font-bold text-slate-800">
-                        {activeTab === 'routes' ? 'Active Routes' : 'Custom Ports'}
+                        {activeTab === 'routes' ? 'Active Routes Config' : 'Custom Port Database'}
                     </h2>
                     <span className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold">
                         {activeTab === 'routes' ? savedRoutes.length : savedPorts.length}
@@ -516,47 +562,61 @@ export const AdminSettings: React.FC = () => {
                             </div>
                         ) : (
                             <div className="grid gap-4">
-                                {savedRoutes.map((route) => (
-                                    <div key={route.id} className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm hover:shadow-md transition-shadow group relative">
-                                        <div className="flex flex-col sm:flex-row justify-between items-start mb-3 gap-2">
-                                            <div className="flex items-center gap-2 text-sm font-bold text-slate-800 flex-wrap">
-                                                <span className="bg-slate-100 px-2 py-1 rounded text-slate-600 whitespace-nowrap">{route.origin}</span>
-                                                <ArrowRight className="w-4 h-4 text-slate-300" />
-                                                <span className="bg-slate-100 px-2 py-1 rounded text-slate-600 whitespace-nowrap">{route.destination}</span>
-                                            </div>
-                                            <div className="flex gap-2 self-end sm:self-auto opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                                                <button onClick={() => handleEditRoute(route)} className="p-1.5 hover:bg-blue-50 text-blue-600 rounded">
-                                                    <Edit3 className="w-4 h-4" />
-                                                </button>
-                                                <button onClick={() => handleDeleteRoute(route.id)} className="p-1.5 hover:bg-red-50 text-red-600 rounded">
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        </div>
-                                        
-                                        <div className="grid grid-cols-2 gap-4 text-sm">
-                                            <div className="bg-blue-50/50 p-2 rounded border border-blue-100">
-                                                <span className="text-[10px] font-bold text-blue-400 uppercase">Ocean</span>
-                                                <div className="flex flex-col sm:flex-row justify-between mt-1 gap-1">
-                                                    <span className="text-slate-700">{route.oceanDistance.toLocaleString()} NM</span>
-                                                    <span className="font-medium text-slate-900">{route.oceanTime} days</span>
+                                {savedRoutes.map((route) => {
+                                    // Determine if this is an Ocean-only, Air-only, or Mixed record (legacy)
+                                    const isOcean = route.oceanDistance > 0;
+                                    const isAir = route.airDistance > 0;
+                                    
+                                    return (
+                                        <div key={route.id} className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm hover:shadow-md transition-shadow group relative">
+                                            <div className="flex flex-col sm:flex-row justify-between items-start mb-3 gap-2">
+                                                <div className="flex items-center gap-2 text-sm font-bold text-slate-800 flex-wrap">
+                                                    {isOcean && <Ship className="w-4 h-4 text-blue-500" />}
+                                                    {isAir && <Plane className="w-4 h-4 text-indigo-500" />}
+                                                    <span className="bg-slate-100 px-2 py-1 rounded text-slate-600 whitespace-nowrap">{route.origin}</span>
+                                                    <ArrowRight className="w-4 h-4 text-slate-300" />
+                                                    <span className="bg-slate-100 px-2 py-1 rounded text-slate-600 whitespace-nowrap">{route.destination}</span>
+                                                </div>
+                                                <div className="flex gap-2 self-end sm:self-auto opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                                                    <button onClick={() => handleEditRoute(route)} className="p-1.5 hover:bg-blue-50 text-blue-600 rounded">
+                                                        <Edit3 className="w-4 h-4" />
+                                                    </button>
+                                                    <button onClick={() => handleDeleteRoute(route.id)} className="p-1.5 hover:bg-red-50 text-red-600 rounded">
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
                                                 </div>
                                             </div>
-                                            <div className="bg-indigo-50/50 p-2 rounded border border-indigo-100">
-                                                <span className="text-[10px] font-bold text-indigo-400 uppercase">Air</span>
-                                                <div className="flex flex-col sm:flex-row justify-between mt-1 gap-1">
-                                                    <span className="text-slate-700">{route.airDistance.toLocaleString()} km</span>
-                                                    <span className="font-medium text-slate-900">{route.airTime}</span>
-                                                </div>
+                                            
+                                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                                {isOcean ? (
+                                                    <div className="bg-blue-50/50 p-2 rounded border border-blue-100">
+                                                        <span className="text-[10px] font-bold text-blue-400 uppercase">Ocean</span>
+                                                        <div className="flex flex-col sm:flex-row justify-between mt-1 gap-1">
+                                                            <span className="text-slate-700">{route.oceanDistance.toLocaleString()} NM</span>
+                                                            <span className="font-medium text-slate-900">{route.oceanTime} days</span>
+                                                        </div>
+                                                    </div>
+                                                ) : <div className="p-2 border border-dashed border-slate-100 rounded text-slate-300 text-xs flex items-center justify-center">N/A</div>}
+                                                
+                                                {isAir ? (
+                                                    <div className="bg-indigo-50/50 p-2 rounded border border-indigo-100">
+                                                        <span className="text-[10px] font-bold text-indigo-400 uppercase">Air</span>
+                                                        <div className="flex flex-col sm:flex-row justify-between mt-1 gap-1">
+                                                            <span className="text-slate-700">{route.airDistance.toLocaleString()} km</span>
+                                                            <span className="font-medium text-slate-900">{route.airTime}</span>
+                                                        </div>
+                                                    </div>
+                                                ) : <div className="p-2 border border-dashed border-slate-100 rounded text-slate-300 text-xs flex items-center justify-center">N/A</div>}
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )
                     ) : (
                         /* PORTS LIST */
-                        savedPorts.length === 0 ? (
+                        // (Existing Ports List rendering remains same)
+                         savedPorts.length === 0 ? (
                             <div className="h-full flex flex-col items-center justify-center text-slate-400 text-center py-8">
                                 <Anchor className="w-12 h-12 mb-3 text-slate-200" />
                                 <p>No custom ports saved.</p>

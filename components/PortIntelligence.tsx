@@ -14,7 +14,7 @@ export const PortIntelligence: React.FC<PortIntelligenceProps> = ({ mode }) => {
     const [terminals, setTerminals] = useState<TerminalOption[]>([]);
     
     // Lookup State
-    const [searchMode, setSearchMode] = useState<'OCEAN' | 'AIR'>('OCEAN'); // New toggle state
+    const [searchMode, setSearchMode] = useState<'OCEAN' | 'AIR'>('OCEAN'); 
     const [lookupQuery, setLookupQuery] = useState('');
     const [portData, setPortData] = useState<PortDetails | null>(null);
     const [loadingPort, setLoadingPort] = useState(false);
@@ -24,7 +24,8 @@ export const PortIntelligence: React.FC<PortIntelligenceProps> = ({ mode }) => {
     const [loadingCongestion, setLoadingCongestion] = useState(false);
     const [congestionData, setCongestionData] = useState<{ text: string, sources: {title: string, uri: string}[] } | null>(null);
 
-    // Route State
+    // Route Calculator State
+    const [routeCalcMode, setRouteCalcMode] = useState<'OCEAN' | 'AIR'>('OCEAN'); // New Mode for Calculator
     const [originQuery, setOriginQuery] = useState('');
     const [destQuery, setDestQuery] = useState('');
     const [routeData, setRouteData] = useState<RouteDetails | null>(null);
@@ -40,6 +41,13 @@ export const PortIntelligence: React.FC<PortIntelligenceProps> = ({ mode }) => {
             setSearchMode(newMode);
             setLookupQuery(''); // Reset selection to avoid mismatch
         }
+    };
+
+    const handleRouteModeToggle = (newMode: 'OCEAN' | 'AIR') => {
+        setRouteCalcMode(newMode);
+        setOriginQuery('');
+        setDestQuery('');
+        setRouteData(null);
     };
 
     // Fixed: Now accepts an optional override string to handle click events immediately
@@ -98,6 +106,7 @@ export const PortIntelligence: React.FC<PortIntelligenceProps> = ({ mode }) => {
 
     // --- VIEW: PORT DATABASE ---
     if (mode === 'lookup') {
+        // (Existing Lookup View Code remains the same)
         return (
             <div className="flex flex-col gap-6 max-w-5xl mx-auto">
                 {/* Hero Search Section */}
@@ -353,7 +362,6 @@ export const PortIntelligence: React.FC<PortIntelligenceProps> = ({ mode }) => {
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            {/* Corrected: Added explicit 'value' fields to match services/portData.ts exactly */}
                             {[
                                 { name: 'Shanghai', code: 'CNSHA', value: 'Shanghai Port' },
                                 { name: 'Rotterdam', code: 'NLRTM', value: 'Rotterdam Port' },
@@ -396,7 +404,7 @@ export const PortIntelligence: React.FC<PortIntelligenceProps> = ({ mode }) => {
                 {/* Input Panel */}
                 <div className="lg:col-span-4 flex flex-col gap-6">
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sticky top-6">
-                        <div className="flex items-center gap-4 mb-8">
+                        <div className="flex items-center gap-4 mb-6">
                             <div className="p-3 bg-gradient-to-br from-indigo-500 to-violet-600 text-white rounded-xl shadow-lg shadow-indigo-200">
                                 <Navigation className="w-6 h-6" />
                             </div>
@@ -404,54 +412,58 @@ export const PortIntelligence: React.FC<PortIntelligenceProps> = ({ mode }) => {
                                 <h2 className="text-lg font-bold text-slate-800 leading-tight">Route<br/>Configuration</h2>
                             </div>
                         </div>
+
+                         {/* Mode Switcher */}
+                         <div className="bg-slate-100 p-1 rounded-xl flex gap-1 mb-6">
+                            <button
+                                type="button"
+                                onClick={() => handleRouteModeToggle('OCEAN')}
+                                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold transition-all ${routeCalcMode === 'OCEAN' ? 'bg-white text-blue-600 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                <Ship className="w-4 h-4" /> Ocean
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleRouteModeToggle('AIR')}
+                                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold transition-all ${routeCalcMode === 'AIR' ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                <Plane className="w-4 h-4" /> Air
+                            </button>
+                        </div>
                         
                         <form onSubmit={handleRouteCalc} className="space-y-6">
                             <div className="relative pl-4 border-l-2 border-slate-100 space-y-6">
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">Origin</label>
+                                    <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">Origin {routeCalcMode === 'OCEAN' ? 'Port' : 'Airport'}</label>
                                     <div className="relative group">
-                                        <div className="absolute -left-[21px] top-3 w-3 h-3 rounded-full bg-white border-2 border-blue-500 z-10"></div>
+                                        <div className={`absolute -left-[21px] top-3 w-3 h-3 rounded-full bg-white border-2 z-10 ${routeCalcMode === 'OCEAN' ? 'border-blue-500' : 'border-indigo-500'}`}></div>
                                         <select 
                                             className="w-full pl-3 pr-8 py-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all cursor-pointer appearance-none"
                                             value={originQuery}
                                             onChange={(e) => setOriginQuery(e.target.value)}
                                         >
                                             <option value="" disabled>Select Origin...</option>
-                                            <optgroup label="Seaports">
-                                                {terminals.filter(t => t.type === 'OCEAN').map(t => (
-                                                    <option key={t.value + t.type} value={t.value}>{t.label}</option>
-                                                ))}
-                                            </optgroup>
-                                            <optgroup label="Airports">
-                                                {terminals.filter(t => t.type === 'AIR').map(t => (
-                                                    <option key={t.value + t.type} value={t.value}>{t.label}</option>
-                                                ))}
-                                            </optgroup>
+                                            {terminals.filter(t => t.type === routeCalcMode).map(t => (
+                                                <option key={t.value + t.type} value={t.value}>{t.label}</option>
+                                            ))}
                                         </select>
                                         <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3.5 pointer-events-none" />
                                     </div>
                                 </div>
                                 
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">Destination</label>
+                                    <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">Destination {routeCalcMode === 'OCEAN' ? 'Port' : 'Airport'}</label>
                                     <div className="relative group">
-                                        <div className="absolute -left-[21px] top-3 w-3 h-3 rounded-full bg-indigo-600 border-2 border-white shadow-sm z-10"></div>
+                                        <div className={`absolute -left-[21px] top-3 w-3 h-3 rounded-full border-2 border-white shadow-sm z-10 ${routeCalcMode === 'OCEAN' ? 'bg-blue-600' : 'bg-indigo-600'}`}></div>
                                         <select 
                                             className="w-full pl-3 pr-8 py-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all cursor-pointer appearance-none"
                                             value={destQuery}
                                             onChange={(e) => setDestQuery(e.target.value)}
                                         >
                                             <option value="" disabled>Select Destination...</option>
-                                            <optgroup label="Seaports">
-                                                {terminals.filter(t => t.type === 'OCEAN').map(t => (
-                                                    <option key={t.value + t.type} value={t.value}>{t.label}</option>
-                                                ))}
-                                            </optgroup>
-                                            <optgroup label="Airports">
-                                                {terminals.filter(t => t.type === 'AIR').map(t => (
-                                                    <option key={t.value + t.type} value={t.value}>{t.label}</option>
-                                                ))}
-                                            </optgroup>
+                                             {terminals.filter(t => t.type === routeCalcMode).map(t => (
+                                                <option key={t.value + t.type} value={t.value}>{t.label}</option>
+                                            ))}
                                         </select>
                                         <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3.5 pointer-events-none" />
                                     </div>
@@ -461,7 +473,7 @@ export const PortIntelligence: React.FC<PortIntelligenceProps> = ({ mode }) => {
                             <button 
                                 type="submit"
                                 disabled={loadingRoute || !originQuery || !destQuery}
-                                className="w-full bg-slate-900 text-white py-4 rounded-xl text-sm font-bold hover:shadow-xl hover:bg-slate-800 disabled:opacity-70 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-3 group"
+                                className={`w-full text-white py-4 rounded-xl text-sm font-bold hover:shadow-xl disabled:opacity-70 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-3 group ${routeCalcMode === 'OCEAN' ? 'bg-slate-900 hover:bg-blue-900' : 'bg-slate-900 hover:bg-indigo-900'}`}
                             >
                                 {loadingRoute ? (
                                     <>
@@ -470,7 +482,7 @@ export const PortIntelligence: React.FC<PortIntelligenceProps> = ({ mode }) => {
                                     </>
                                 ) : (
                                     <>
-                                        Calculate Optimal Route 
+                                        Calculate {routeCalcMode === 'OCEAN' ? 'Ocean' : 'Air'} Route 
                                         <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                                     </>
                                 )}
@@ -484,10 +496,10 @@ export const PortIntelligence: React.FC<PortIntelligenceProps> = ({ mode }) => {
                      {loadingRoute ? (
                         <div className="h-full bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center p-12 text-center animate-pulse min-h-[500px]">
                             <div className="relative mb-8">
-                                <div className="w-24 h-24 bg-indigo-50 rounded-full flex items-center justify-center">
-                                    <Layers className="w-10 h-10 text-indigo-200 animate-bounce" />
+                                <div className={`w-24 h-24 rounded-full flex items-center justify-center ${routeCalcMode === 'OCEAN' ? 'bg-blue-50' : 'bg-indigo-50'}`}>
+                                    {routeCalcMode === 'OCEAN' ? <Ship className="w-10 h-10 text-blue-200 animate-bounce" /> : <Plane className="w-10 h-10 text-indigo-200 animate-bounce" />}
                                 </div>
-                                <div className="absolute inset-0 border-4 border-indigo-100 border-t-indigo-500 rounded-full animate-spin"></div>
+                                <div className={`absolute inset-0 border-4 border-t-transparent rounded-full animate-spin ${routeCalcMode === 'OCEAN' ? 'border-blue-100 border-t-blue-500' : 'border-indigo-100 border-t-indigo-500'}`}></div>
                             </div>
                             <h3 className="text-xl font-bold text-slate-800 mb-2">Analyzing Global Lanes</h3>
                             <p className="text-slate-500">Calculating distance, transit times, and risk factors...</p>
@@ -497,7 +509,7 @@ export const PortIntelligence: React.FC<PortIntelligenceProps> = ({ mode }) => {
                              
                             {/* Route Summary Header */}
                             <div className="bg-white rounded-2xl p-6 md:p-8 border border-slate-200 shadow-sm flex flex-col items-center gap-6 relative overflow-hidden">
-                                <div className="absolute top-0 left-0 w-full h-1 sm:w-1 sm:h-full bg-indigo-500"></div>
+                                <div className={`absolute top-0 left-0 w-full h-1 sm:w-1 sm:h-full ${routeCalcMode === 'OCEAN' ? 'bg-blue-500' : 'bg-indigo-500'}`}></div>
                                 <div className="flex flex-col sm:flex-row items-center justify-between w-full gap-6 sm:gap-4 z-10">
                                     
                                     <div className="text-center sm:text-left flex-1 min-w-0">
@@ -514,7 +526,9 @@ export const PortIntelligence: React.FC<PortIntelligenceProps> = ({ mode }) => {
                                             </div>
                                             <div className="hidden sm:block h-[2px] w-8 md:w-16 bg-slate-200"></div>
                                         </div>
-                                        <span className="text-[10px] sm:text-xs font-bold text-indigo-600 uppercase tracking-wide sm:tracking-widest mt-1 text-center">Analysis Complete</span>
+                                        <span className={`text-[10px] sm:text-xs font-bold uppercase tracking-wide sm:tracking-widest mt-1 text-center ${routeCalcMode === 'OCEAN' ? 'text-blue-600' : 'text-indigo-600'}`}>
+                                            {routeCalcMode === 'OCEAN' ? 'Seaport-to-Seaport' : 'Airport-to-Airport'}
+                                        </span>
                                     </div>
 
                                     <div className="text-center sm:text-right flex-1 min-w-0">
@@ -525,75 +539,79 @@ export const PortIntelligence: React.FC<PortIntelligenceProps> = ({ mode }) => {
                                 </div>
                             </div>
 
-                             {/* Comparison Grid - New Design */}
-                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                 {/* Ocean Card */}
-                                 <div className="bg-gradient-to-br from-white to-slate-50 p-8 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-lg transition-all hover:-translate-y-1">
-                                    <div className="absolute top-0 right-0 w-32 h-32 bg-blue-100/50 rounded-bl-[100px] transition-all group-hover:bg-blue-200/50"></div>
-                                    <Ship className="absolute top-6 right-6 w-8 h-8 text-blue-500" />
-                                    
-                                    <div className="relative z-10">
-                                        <div className="mb-6">
-                                            <h4 className="font-bold text-slate-800 text-xl mb-1">Ocean Freight</h4>
-                                            <p className="text-sm text-slate-500">Standard Shipping</p>
-                                        </div>
+                             {/* Comparison Grid - NOW ONLY SHOWS SELECTED MODE */}
+                             <div className="grid grid-cols-1 gap-6">
+                                 {routeCalcMode === 'OCEAN' ? (
+                                    /* Ocean Card */
+                                    <div className="bg-gradient-to-br from-white to-slate-50 p-8 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-lg transition-all hover:-translate-y-1">
+                                        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-100/50 rounded-bl-[100px] transition-all group-hover:bg-blue-200/50"></div>
+                                        <Ship className="absolute top-6 right-6 w-8 h-8 text-blue-500" />
                                         
-                                        <div className="grid grid-cols-2 gap-4 mb-6">
-                                            <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
-                                                <div className="flex items-center gap-2 text-slate-400 text-xs font-bold uppercase mb-1">
-                                                    <Clock className="w-3 h-3" /> Est. Time
-                                                </div>
-                                                <div className="text-2xl font-bold text-slate-800">{routeData.ocean.transitTimeDays} <span className="text-sm font-normal text-slate-400">Days</span></div>
+                                        <div className="relative z-10">
+                                            <div className="mb-6">
+                                                <h4 className="font-bold text-slate-800 text-xl mb-1">Ocean Freight Analysis</h4>
+                                                <p className="text-sm text-slate-500">Deep Sea Routing • Containerized</p>
                                             </div>
-                                            <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
-                                                <div className="flex items-center gap-2 text-slate-400 text-xs font-bold uppercase mb-1">
-                                                    <Ruler className="w-3 h-3" /> Distance
+                                            
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                                                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                                                    <div className="flex items-center gap-2 text-slate-400 text-xs font-bold uppercase mb-1">
+                                                        <Clock className="w-3 h-3" /> Est. Transit Time
+                                                    </div>
+                                                    <div className="text-3xl font-bold text-slate-800">{routeData.ocean.transitTimeDays} <span className="text-base font-normal text-slate-400">Days</span></div>
                                                 </div>
-                                                <div className="text-lg font-bold text-slate-800 mt-1">{routeData.ocean.distanceNm.toLocaleString()} <span className="text-xs font-normal text-slate-400">NM</span></div>
+                                                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                                                    <div className="flex items-center gap-2 text-slate-400 text-xs font-bold uppercase mb-1">
+                                                        <Ruler className="w-3 h-3" /> Voyage Distance
+                                                    </div>
+                                                    <div className="text-2xl font-bold text-slate-800 mt-1">{routeData.ocean.distanceNm.toLocaleString()} <span className="text-sm font-normal text-slate-400">NM</span></div>
+                                                </div>
                                             </div>
-                                        </div>
 
-                                        <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100">
-                                            <p className="text-sm text-slate-600 leading-relaxed">
-                                                {routeData.ocean.routeDescription}
-                                            </p>
+                                            <div className="bg-blue-50/50 p-5 rounded-xl border border-blue-100">
+                                                <h5 className="text-xs font-bold text-blue-500 uppercase tracking-wide mb-2">Routing Details</h5>
+                                                <p className="text-sm text-slate-600 leading-relaxed">
+                                                    {routeData.ocean.routeDescription}
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
-                                 </div>
-
-                                 {/* Air Card */}
-                                 <div className="bg-gradient-to-br from-white to-slate-50 p-8 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-lg transition-all hover:-translate-y-1">
-                                     <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-100/50 rounded-bl-[100px] transition-all group-hover:bg-indigo-200/50"></div>
-                                     <Plane className="absolute top-6 right-6 w-8 h-8 text-indigo-500" />
-                                    
-                                    <div className="relative z-10">
-                                        <div className="mb-6">
-                                            <h4 className="font-bold text-slate-800 text-xl mb-1">Air Freight</h4>
-                                            <p className="text-sm text-slate-500">Expedited Shipping</p>
-                                        </div>
+                                 ) : (
+                                    /* Air Card */
+                                    <div className="bg-gradient-to-br from-white to-slate-50 p-8 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-lg transition-all hover:-translate-y-1">
+                                        <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-100/50 rounded-bl-[100px] transition-all group-hover:bg-indigo-200/50"></div>
+                                        <Plane className="absolute top-6 right-6 w-8 h-8 text-indigo-500" />
                                         
-                                        <div className="grid grid-cols-2 gap-4 mb-6">
-                                            <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
-                                                <div className="flex items-center gap-2 text-slate-400 text-xs font-bold uppercase mb-1">
-                                                    <Clock className="w-3 h-3" /> Est. Time
-                                                </div>
-                                                <div className="text-2xl font-bold text-indigo-600">{routeData.air.transitTimeHours}</div>
+                                        <div className="relative z-10">
+                                            <div className="mb-6">
+                                                <h4 className="font-bold text-slate-800 text-xl mb-1">Air Freight Analysis</h4>
+                                                <p className="text-sm text-slate-500">Direct/Transshipment • Cargo Aircraft</p>
                                             </div>
-                                            <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
-                                                <div className="flex items-center gap-2 text-slate-400 text-xs font-bold uppercase mb-1">
-                                                    <Ruler className="w-3 h-3" /> Distance
+                                            
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                                                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                                                    <div className="flex items-center gap-2 text-slate-400 text-xs font-bold uppercase mb-1">
+                                                        <Clock className="w-3 h-3" /> Flight Duration
+                                                    </div>
+                                                    <div className="text-3xl font-bold text-indigo-600">{routeData.air.transitTimeHours}</div>
                                                 </div>
-                                                <div className="text-lg font-bold text-slate-800 mt-1">{routeData.air.distanceKm.toLocaleString()} <span className="text-xs font-normal text-slate-400">KM</span></div>
+                                                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                                                    <div className="flex items-center gap-2 text-slate-400 text-xs font-bold uppercase mb-1">
+                                                        <Ruler className="w-3 h-3" /> Great Circle Dist.
+                                                    </div>
+                                                    <div className="text-2xl font-bold text-slate-800 mt-1">{routeData.air.distanceKm.toLocaleString()} <span className="text-sm font-normal text-slate-400">KM</span></div>
+                                                </div>
                                             </div>
-                                        </div>
 
-                                        <div className="bg-indigo-50/50 p-4 rounded-xl border border-indigo-100">
-                                            <p className="text-sm text-slate-600 leading-relaxed">
-                                                {routeData.air.routeDescription}
-                                            </p>
+                                            <div className="bg-indigo-50/50 p-5 rounded-xl border border-indigo-100">
+                                                <h5 className="text-xs font-bold text-indigo-500 uppercase tracking-wide mb-2">Flight Path</h5>
+                                                <p className="text-sm text-slate-600 leading-relaxed">
+                                                    {routeData.air.routeDescription}
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
-                                 </div>
+                                 )}
                              </div>
                         </div>
                     ) : (

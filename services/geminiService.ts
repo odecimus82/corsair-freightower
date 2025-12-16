@@ -240,41 +240,36 @@ export const calculateQuickMetrics = async (origin: string, destination: string)
 export const calculateRouteDetails = async (origin: string, destination: string): Promise<RouteDetails> => {
     
     // 1. CHECK "BACKEND" OVERRIDES FIRST
+    // Using strict comparison logic updated in routeStorage
     const override = RouteDB.get(origin, destination);
     
-    // 2. IF OVERRIDE EXISTS, USE IT AND MOCK THE REST
+    // 2. IF OVERRIDE EXISTS, RETURN IT DIRECTLY (Bypass AI to prevent overwrite/delay)
     if (override) {
-        console.log("Using backend route override for:", origin, destination);
-        try {
-            // We fetch the AI data to get coordinates + descriptions + waypoints
-            const aiData = await fetchRouteFromGemini(origin, destination);
-            
-            // Overwrite numeric values with Admin settings
-            return {
-                ...aiData,
-                ocean: {
-                    ...aiData.ocean,
-                    distanceNm: override.oceanDistance,
-                    transitTimeDays: override.oceanTime,
-                    routeDescription: `(ADMIN OVERRIDE) ${aiData.ocean.routeDescription}`
-                },
-                air: {
-                    ...aiData.air,
-                    distanceKm: override.airDistance,
-                    transitTimeHours: override.airTime,
-                    routeDescription: `(ADMIN OVERRIDE) ${aiData.air.routeDescription}`
-                }
-            };
-        } catch (e) {
-            // Fallback if AI fails but we have override data (return 0,0 coords)
-             return {
-                origin, destination,
-                originCoordinates: { lat: 0, lng: 0 },
-                destinationCoordinates: { lat: 0, lng: 0 },
-                ocean: { distanceNm: override.oceanDistance, transitTimeDays: override.oceanTime, routeDescription: "Manual Route", keyWaypoints: [], waypoints: [] },
-                air: { distanceKm: override.airDistance, transitTimeHours: override.airTime, routeDescription: "Manual Route", waypoints: [] }
-            };
-        }
+        console.log(`[GeminiService] HIT: Found manual route override for ${origin} -> ${destination}`);
+        
+        // Return a RouteDetails object populated with override data immediately.
+        // We use mock coordinates since the UI lists mostly text data, and this ensures speed.
+        return {
+            origin: override.origin,
+            destination: override.destination,
+            originCoordinates: { lat: 0, lng: 0 },
+            destinationCoordinates: { lat: 0, lng: 0 },
+            ocean: {
+                distanceNm: override.oceanDistance,
+                transitTimeDays: override.oceanTime,
+                routeDescription: "Route data configured by System Administrator.",
+                keyWaypoints: [],
+                waypoints: []
+            },
+            air: {
+                distanceKm: override.airDistance,
+                transitTimeHours: override.airTime,
+                routeDescription: "Route data configured by System Administrator.",
+                waypoints: []
+            }
+        };
+    } else {
+        console.log(`[GeminiService] MISS: No override found for ${origin} -> ${destination}. Asking AI.`);
     }
 
     // 3. NO OVERRIDE, STANDARD AI CALL
