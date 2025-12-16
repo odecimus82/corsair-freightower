@@ -4,9 +4,9 @@ import { Shipment, TransportMode, ShipmentStatus, PortDetails, RouteDetails, ETA
 import { RouteDB } from "./routeStorage";
 
 // Initialize Gemini Client
-// UPDATED: Now checks LocalStorage first for dynamic user input
+// UPDATED: Now includes a Hardcoded Default Key for public access
 const getApiKey = (): string => {
-  // 1. Check LocalStorage (User entered via Admin UI)
+  // 1. Check LocalStorage (User entered via Admin UI - Override)
   if (typeof window !== 'undefined' && window.localStorage) {
       const stored = window.localStorage.getItem('freightflow_api_key');
       if (stored && stored.trim().length > 0) return stored;
@@ -19,12 +19,8 @@ const getApiKey = (): string => {
     return import.meta.env.VITE_API_KEY;
   }
   
-  // 3. Fallback / Standard Node check
-  try {
-    return process.env.API_KEY || '';
-  } catch (e) {
-    return '';
-  }
+  // 3. Hardcoded System Key (Public Access)
+  return 'AIzaSyCaaECeeQJ2-HhCIRip4l1sHFcE7_XtECc';
 };
 
 // Create a client instance. 

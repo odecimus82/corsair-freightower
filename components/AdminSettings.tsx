@@ -349,20 +349,20 @@ export const AdminSettings: React.FC = () => {
                                  <Key className="w-4 h-4" /> Gemini API Configuration
                              </h3>
                              <p className="text-xs text-indigo-600 leading-relaxed">
-                                 Enter your paid Google Gemini API Key here. This connects the dashboard to your real Google Cloud billing account, unlocking higher rate limits and real-time data access.
+                                 A valid API Key is required to access real-time shipping data. You may override the default system key below.
                              </p>
                          </div>
 
                          <form onSubmit={handleSaveApiKey} className="space-y-4">
                              <div>
-                                 <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Google Gemini API Key</label>
+                                 <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Custom Gemini API Key</label>
                                  <div className="relative">
                                      <input 
                                          type={showKey ? "text" : "password"}
                                          value={apiKey}
                                          onChange={(e) => setApiKey(e.target.value)}
                                          className="w-full pl-10 pr-10 py-3 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
-                                         placeholder="AIzaSy..."
+                                         placeholder="Enter custom key to override system default..."
                                      />
                                      <Shield className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
                                      <button 
@@ -402,8 +402,8 @@ export const AdminSettings: React.FC = () => {
                              <div className="space-y-2">
                                  <div className="flex justify-between items-center text-sm">
                                      <span className="text-slate-600">API Connection</span>
-                                     <span className={`px-2 py-0.5 rounded text-xs font-bold ${apiKey ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                                         {apiKey ? 'Authenticated' : 'Mock / Demo Mode'}
+                                     <span className={`px-2 py-0.5 rounded text-xs font-bold ${apiKey ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
+                                         {apiKey ? 'Custom Key Active' : 'Default System Key'}
                                      </span>
                                  </div>
                                  <div className="flex justify-between items-center text-sm">
